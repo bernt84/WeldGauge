@@ -167,7 +167,7 @@
 
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
-    <div class="mini">Tap et billede for at åbne det, se alle markeringer og trække punkterne. ✕ sletter.</div>
+    <div class="mini">Billeder slettes automatisk efter 30 dage (⏳ tæller ned). ⤓ gemmer på enheden · 📌 beholder permanent · ✕ sletter. Tap billedet for at åbne og redigere.</div>
     <div class="thumbs" id="thumbs"></div>
     <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent billeder</button><button class="ghost" id="clearGalBtn">Ryd galleri</button></div>
   </div>
@@ -202,6 +202,7 @@
   const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
   const isMobile=isTouch&&Math.min(screen.width,screen.height)<820;
   const hasFS = !isMobile && ('showDirectoryPicker' in window);
+  const LIFETIME_MS=30*24*3600*1000; // 30 dage auto-sletning fra gemt
 
   function fmt(mm){return mm>=100?mm.toFixed(1):mm.toFixed(2);}
   function pick(L,m){return m[L];}function notP(L){return"ikke tilladt ("+L+")";}
@@ -272,9 +273,9 @@
   $("folderBtn").addEventListener("click",chooseFolder);
 
   // record = minimal persistent form
-  function toRecord(cap){return{id:cap.id,img:cap.img,W:cap.W,H:cap.H,mmPerPx:cap.mmPerPx,calPts:cap.calPts,marks:cap.marks,params:cap.params};}
+  function toRecord(cap){return{id:cap.id,created:cap.created||Date.now(),keep:!!cap.keep,img:cap.img,W:cap.W,H:cap.H,mmPerPx:cap.mmPerPx,calPts:cap.calPts,marks:cap.marks,params:cap.params};}
   function fromRecord(rec){const results=rec.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,rec.marks.length,m.pts,rec.mmPerPx),rec.params));
-    return{id:rec.id,img:rec.img,W:rec.W,H:rec.H,mmPerPx:rec.mmPerPx,calPts:rec.calPts,marks:rec.marks,params:rec.params,results,thumb:null};}
+    return{id:rec.id,created:rec.created||Date.now(),keep:!!rec.keep,img:rec.img,W:rec.W,H:rec.H,mmPerPx:rec.mmPerPx,calPts:rec.calPts,marks:rec.marks,params:rec.params,results,thumb:null};}
   function valsForPts(type,_n,pts,scale){const mt=DEF[type].mt;
     if(mt==="ang"){const[a,b,c]=pts;const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};const dd=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));return{deg:Math.acos(Math.max(-1,Math.min(1,dd)))*180/Math.PI};}
     if(mt==="p2l")return{d:perp(pts[2],pts[0],pts[1])*scale};
@@ -408,7 +409,7 @@
       else ln(p[0],p[1],col);
       const a=p[0];const t=(i+1)+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);});}
   function makeThumb(cap,cb){const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=cap.W;c.height=cap.H;const g=c.getContext("2d");g.drawImage(im,0,0);annotate(g,cap);cb(c.toDataURL("image/jpeg",.8));};im.src=cap.img;}
-  function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
+  function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),created:Date.now(),keep:false,img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
 
   async function persistCapture(cap){
     if(isMobile){idbPut(toRecord(cap));}
@@ -420,10 +421,43 @@
     makeThumb(cap,u=>{cap.thumb=u;renderGallery();persistCapture(cap);});
     if(!isMobile&&!(hasFS&&dirHandle))setStatus("Billede gemt i galleriet. Vælg evt. en mappe for at skrive til disk, eller brug Hent billeder.");});
 
+  function expiryBadge(c){
+    if(c.keep)return '<div class="tlabel" style="color:#a371f7">📌 Beholdt · '+c.marks.length+' mark.</div>';
+    const now=Date.now();const days=Math.ceil(((c.created||now)+LIFETIME_MS-now)/864e5);
+    if(c.expired||days<=0)return '<div class="tlabel" style="color:#f85149">⚠ Udløbet — gem nu</div>';
+    const col=days<=3?'#ffb000':'#2ea043';
+    return '<div class="tlabel" style="color:'+col+'">⏳ '+days+' dg · '+c.marks.length+' mark.</div>';}
   function renderGallery(){const g=$("gallery"),t=$("thumbs");g.classList.toggle("show",captures.length>0);$("reportCard").style.display=captures.length>0?"flex":"none";$("galCount").textContent=captures.length;t.innerHTML="";
     captures.forEach((cap,i)=>{const fail=cap.results.some(r=>r.ok===false);const hasV=cap.results.some(r=>r.ok!=null);const dot=hasV?(fail?'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#f85149"></span>':'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#2ea043"></span>'):'';
-      const d=document.createElement("div");d.className="thumb";d.innerHTML=`<img src="${cap.thumb||cap.img}"><button class="tx" data-i="${i}">✕</button>${dot}<div class="tlabel">${cap.marks.length} mark.</div>`;
-      d.querySelector("img").addEventListener("click",()=>openEditor(i));d.querySelector(".tx").addEventListener("click",ev=>{ev.stopPropagation();const idx=+ev.target.dataset.i;const id=captures[idx].id;captures.splice(idx,1);if(isMobile)idbDel(id);sbDelete(id);knownIds.delete(id);renderGallery();});t.appendChild(d);});}
+      const d=document.createElement("div");d.className="thumb";if(cap.expired)d.style.outline="2px solid #f85149";
+      d.innerHTML=`<img src="${cap.thumb||cap.img}">`+
+        `<button class="tx" data-del="${i}" title="Slet">✕</button>`+
+        `<button class="tx" data-save="${i}" style="right:24px;background:rgba(57,197,207,.85)" title="Gem på enheden">⤓</button>`+
+        `<button class="tx" data-keep="${i}" style="right:46px;background:${cap.keep?'rgba(163,113,247,.95)':'rgba(13,17,23,.7)'}" title="Behold (ingen auto-sletning)">📌</button>`+
+        `${dot}${expiryBadge(cap)}`;
+      d.querySelector("img").addEventListener("click",()=>openEditor(i));
+      d.querySelector("[data-del]").addEventListener("click",ev=>{ev.stopPropagation();const idx=+ev.currentTarget.dataset.del;const c=captures[idx];captures.splice(idx,1);if(isMobile)idbDel(c.id);purgeCloud(c);knownIds.delete(c.id);renderGallery();});
+      d.querySelector("[data-save]").addEventListener("click",ev=>{ev.stopPropagation();saveOne(captures[+ev.currentTarget.dataset.save],+ev.currentTarget.dataset.save);});
+      d.querySelector("[data-keep]").addEventListener("click",ev=>{ev.stopPropagation();keepOne(captures[+ev.currentTarget.dataset.keep]);});
+      t.appendChild(d);});}
+
+  // gem ét billede på enheden (download; på PC også til valgt mappe)
+  function saveOne(c,i){const url=c.thumb||c.img;const a=document.createElement("a");a.href=url;a.download="weldgauge-"+((i||0)+1)+".jpg";a.click();
+    if(!isMobile&&hasFS&&dirHandle){writeToFolder("weldgauge-"+c.id+".jpg",dataURLtoBlob(url));}
+    setStatus("Billede gemt på enheden.");}
+  // behold permanent (ingen auto-sletning) — re-persisterer hvis det allerede var ryddet
+  async function keepOne(c){c.keep=true;c.expired=false;c._purged=false;
+    if(isMobile)idbPut(toRecord(c));
+    if(sb&&sbSag&&sbOrg){try{const path=c.path||(sbOrg+"/"+sbSag+"/"+c.id+".jpg");c.path=path;await sb.storage.from("wg-makro").upload(path,dataURLtoBlob(c.img),{contentType:"image/jpeg",upsert:true});await sb.from("wg_maalinger").upsert({id:c.id,sag:sbSag,org_id:sbOrg,img_path:path,w:c.W,h:c.H,mm_per_px:c.mmPerPx,cal_pts:c.calPts,marks:c.marks,params:c.params,keep:true});}catch(e){}}
+    renderGallery();setStatus("Billede beholdt — slettes ikke automatisk.");}
+  // ryd udløbne: vis dem sidste gang (denne session), men fjern fra lager
+  function purgeCloud(c){try{if(c.remote&&sb&&sbSag){sb.from("wg_maalinger").delete().eq("id",c.id).then(()=>{});if(c.path)sb.storage.from("wg-makro").remove([c.path]).then(()=>{});}}catch(e){}}
+  function pruneExpired(){const now=Date.now();let changed=false;
+    captures.forEach(c=>{if(c.keep||!c.created)return;if(now>=c.created+LIFETIME_MS){if(!c.expired){c.expired=true;changed=true;}
+      if(!c._purged){c._purged=true;if(isMobile)idbDel(c.id);purgeCloud(c);}}});
+    if(changed)renderGallery();}
+  setInterval(pruneExpired,60000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")pruneExpired();});
   $("downloadAllBtn").addEventListener("click",()=>{captures.forEach((cap,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=cap.thumb||cap.img;a.download="makro-"+(i+1)+".jpg";a.click();},i*350));});
   $("clearGalBtn").addEventListener("click",()=>{captures=[];if(isMobile)idbClear();renderGallery();});
 
@@ -514,17 +548,17 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
         if(payload.eventType==="INSERT"||payload.eventType==="UPDATE")sbIngest(payload.new);
         else if(payload.eventType==="DELETE"&&payload.old){const id=payload.old.id;const i=captures.findIndex(c=>c.id===id);if(i>=0){captures.splice(i,1);knownIds.delete(id);renderGallery();}}
       }).subscribe();
-      setSyncPill();sbStatus("Forbundet til sag '"+sag+"'. "+((data||[]).length)+" billeder. Nye deles automatisk i virksomheden.",true);}catch(e){sbStatus("Forbindelsesfejl: "+(e.message||e));}}
+      pruneExpired();setSyncPill();sbStatus("Forbundet til sag '"+sag+"'. "+((data||[]).length)+" billeder. Nye deles automatisk i virksomheden.",true);}catch(e){sbStatus("Forbindelsesfejl: "+(e.message||e));}}
   async function sbIngest(row){if(!canSee(row))return;
     if(knownIds.has(row.id)){const cap=captures.find(c=>c.id===row.id);if(cap){cap.marks=row.marks||[];cap.params=row.params||{};cap.mmPerPx=row.mm_per_px;cap.calPts=row.cal_pts||[];cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));makeThumb(cap,u=>{cap.thumb=u;renderGallery();});}return;}
     knownIds.add(row.id);
     try{const{data,error}=await sb.storage.from("wg-makro").download(row.img_path);if(error||!data)return;const url=await blobToDataURL(data);
-      const cap={id:row.id,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
+      const cap={id:row.id,created:row.created_at?Date.parse(row.created_at):Date.now(),keep:!!row.keep,path:row.img_path,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
       cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));
       captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});renderGallery();}catch(e){}}
-  async function sbUpload(cap){if(!sb||!sbSag||!sbUser||!sbOrg)return;try{const path=sbOrg+"/"+sbSag+"/"+cap.id+".jpg";knownIds.add(cap.id);
+  async function sbUpload(cap){if(!sb||!sbSag||!sbUser||!sbOrg)return;try{const path=sbOrg+"/"+sbSag+"/"+cap.id+".jpg";knownIds.add(cap.id);cap.path=path;
     await sb.storage.from("wg-makro").upload(path,dataURLtoBlob(cap.img),{contentType:"image/jpeg",upsert:true});
-    await sb.from("wg_maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params});
+    await sb.from("wg_maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params,keep:!!cap.keep});
   }catch(e){sbStatus("Upload-fejl: "+(e.message||e));}}
   async function sbUpdate(cap){if(!sb||!sbSag||!sbUser)return;try{await sb.from("wg_maalinger").update({marks:cap.marks,params:cap.params,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts}).eq("id",cap.id);}catch(e){}}
   async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("wg_maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("wg-makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
@@ -572,7 +606,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showErr(true,"Browseren understøtter ikke kameraadgang. Brug Upload eller HTTPS.");}else{listCameras();navigator.mediaDevices.addEventListener?.("devicechange",refreshCams);}
   // gendan gemte billeder på telefon
-  if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
+  if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();pruneExpired();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
   if(!isMobile){document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));document.querySelector('#sourceSeg button[data-src="upload"]').classList.add("active");source="upload";switchSource();setStatus("PC: vælg et billede — eller skift til <b>Live</b>. Vælg en mappe for at gemme til disk.");}
   else setStatus("Telefon: <b>Live</b> eller <b>Upload</b>. Billeder gemmes automatisk på enheden.");
 })();
