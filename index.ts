@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
     // Callerens profil — skal være org-admin med en virksomhed
     const { data: prof } = await admin
-      .from("profiles").select("org_id, role").eq("id", caller.user.id).single();
+      .from("wg_profiles").select("org_id, role").eq("id", caller.user.id).single();
     if (!prof || prof.role !== "org_admin" || !prof.org_id)
       return json({ error: "Kun org-admin kan oprette brugere" }, 403);
 
@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     if (uerr || !created?.user) return json({ error: uerr?.message || "Kunne ikke oprette bruger" }, 400);
 
     // Knyt til SAMME virksomhed som org-admin
-    const { error: perr } = await admin.from("profiles")
+    const { error: perr } = await admin.from("wg_profiles")
       .upsert({ id: created.user.id, email, org_id: prof.org_id, role });
     if (perr) return json({ error: perr.message }, 400);
 
