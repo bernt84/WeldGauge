@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WeldGauge">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230d1117'/%3E%3Cg stroke='%2339c5cf' stroke-width='22' fill='none' stroke-linecap='round'%3E%3Cpath d='M96 150 L416 150'/%3E%3Cpath d='M96 150 L96 362'/%3E%3Cpath d='M416 150 L416 362'/%3E%3Cpath d='M96 362 L416 362'/%3E%3C/g%3E%3Ccircle cx='256' cy='246' r='30' fill='%23a371f7'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230d1117'/%3E%3Cg stroke='%2339c5cf' stroke-width='22' fill='none' stroke-linecap='round'%3E%3Cpath d='M96 150 L416 150'/%3E%3Cpath d='M96 150 L96 362'/%3E%3Cpath d='M416 150 L416 362'/%3E%3Cpath d='M96 362 L416 362'/%3E%3C/g%3E%3Ccircle cx='256' cy='246' r='30' fill='%23a371f7'/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<title>WeldGauge — Svejseinspektion</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2330;--line:#2a3441;--ink:#e6edf3;--ink-dim:#8b98a8;
+    --amber:#ffb000;--green:#2ea043;--cyan:#39c5cf;--red:#f85149;--violet:#a371f7;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overscroll-behavior:none}
+  body{display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;margin:0;letter-spacing:.5px;font-weight:600;text-transform:uppercase}
+  header .dot{width:9px;height:9px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);flex:none}
+  header .dot.live{background:var(--green);box-shadow:0 0 8px var(--green)}
+  header .spacer{flex:1}
+  header .scale-badge{font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+  header .scale-badge b{color:var(--cyan)}
+  .stage{position:relative;flex:1;min-height:0;background:#000;overflow:hidden}
+  video,img#still,canvas#overlay{position:absolute;inset:0;width:100%;height:100%}
+  video,img#still{object-fit:contain;background:#000}img#still{display:none}
+  canvas#overlay{touch-action:none}
+  .editbar{position:absolute;top:0;left:0;right:0;display:none;gap:8px;padding:8px 10px;background:rgba(22,27,34,.95);border-bottom:1px solid var(--line);z-index:5}
+  .editbar.show{display:flex}.editbar button{flex:1;padding:8px}
+  .hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);border:1px solid var(--line);border-radius:8px;padding:7px 14px;font-size:13px;max-width:92%;text-align:center;pointer-events:none;backdrop-filter:blur(4px)}
+  .hint b{color:var(--cyan)}
+  .readout{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.92);border:1px solid var(--line);border-radius:10px;padding:8px 16px;font-size:14px;font-variant-numeric:tabular-nums;display:none;max-width:94%;text-align:center;backdrop-filter:blur(4px)}
+  .readout.show{display:block}.readout .big{font-size:20px;font-weight:700}
+  .readout small{font-size:12px;color:var(--ink-dim);font-weight:400}
+  .readout .verdict{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700;vertical-align:middle}
+  .readout .verdict.ok{background:rgba(46,160,67,.2);color:var(--green);border:1px solid var(--green)}
+  .readout .verdict.no{background:rgba(248,81,73,.2);color:var(--red);border:1px solid var(--red)}
+  .controls{background:var(--panel);border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:9px;max-height:60vh;overflow-y:auto}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .row label{font-size:12px;color:var(--ink-dim);white-space:nowrap}
+  select,input[type=number],input[type=text]{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:14px;font-family:inherit;outline:none}
+  select:focus,input:focus{border-color:var(--cyan)}
+  input[type=number]{width:64px;font-variant-numeric:tabular-nums}
+  input[type=text]{flex:1;min-width:80px}select{flex:1;min-width:90px}
+  button{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:10px 12px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.12s}
+  button:active{transform:scale(.97)}
+  button.primary{background:var(--cyan);color:#04181b;border-color:var(--cyan)}
+  button.primary.on{background:var(--amber);color:#1a1100;border-color:var(--amber)}
+  button.ghost{background:transparent}button:disabled{opacity:.4;cursor:not-allowed}
+  .btn-grid{display:flex;gap:8px}.btn-grid button{flex:1}
+  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{flex:1;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px}
+  .seg button:last-child{border-right:none}.seg button.active{background:var(--cyan);color:#04181b}
+  .seg.mode button.active{background:var(--violet);color:#160a26}
+  .mini{font-size:11px;color:var(--ink-dim);line-height:1.45}.mini b{color:var(--ink)}
+  .zoomwrap{display:flex;align-items:center;gap:8px;width:100%}
+  .zoomwrap input[type=range]{flex:1;accent-color:var(--cyan)}
+  .zoomwrap span{font-size:12px;color:var(--ink-dim);min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  .card{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
+  .card h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--cyan)}
+  .note{font-size:10.5px;color:var(--ink-dim);line-height:1.4;border-top:1px solid var(--line);padding-top:6px}.note b{color:var(--ink)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px}.chk input{width:auto}
+  .dlist{display:flex;flex-direction:column;gap:4px}
+  .ditem{display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+  .ditem .vd{width:9px;height:9px;border-radius:50%;flex:none}
+  .ditem .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ditem .vl{font-variant-numeric:tabular-nums;color:var(--ink-dim)}
+  .ditem button{padding:3px 7px;font-size:11px;background:transparent;border:1px solid var(--line)}
+  .gallery{display:none;flex-direction:column;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px}
+  .gallery.show{display:flex}
+  .gallery h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--cyan);display:flex;justify-content:space-between}
+  .gallery h3 .count{color:var(--ink-dim);font-weight:400}
+  .thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .thumb{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;aspect-ratio:4/3;background:#000;cursor:pointer}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .tlabel{position:absolute;left:0;right:0;bottom:0;background:rgba(13,17,23,.8);font-size:9px;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .thumb .tx{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:4px;background:rgba(248,81,73,.85);color:#fff;border:none;font-size:12px;padding:0;display:flex;align-items:center;justify-content:center}
+  .err{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;color:var(--ink-dim)}
+  .err.show{display:flex}.err svg{width:48px;height:48px;opacity:.5}
+  .store-pill{font-size:11px;color:var(--ink-dim)}.store-pill b{color:var(--green)}
+</style>
+</head>
+<body>
+<header><span class="dot" id="liveDot"></span><h1>WeldGauge</h1><span class="spacer"></span><span class="scale-badge" id="syncPill" style="margin-right:10px">⚪ Offline</span><span class="scale-badge" id="scaleBadge">Ikke kalibreret</span></header>
+
+<div class="stage" id="stage">
+  <video id="video" playsinline autoplay muted></video>
+  <img id="still" alt=""><canvas id="overlay"></canvas>
+  <div class="editbar" id="editbar"><button class="primary" id="saveEditBtn">✓ Gem ændringer</button><button class="ghost" id="closeEditBtn">Luk</button></div>
+  <div class="hint" id="hint">Vælg kilde nedenfor</div>
+  <div class="readout" id="readout"></div>
+  <div class="err" id="err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8.5l4-3v13l-4-3v-7zM6 5.5h11a2 2 0 012 2v9a2 2 0 01-2 2H6"/><line x1="3" y1="3" x2="21" y2="21" stroke-width="2"/></svg><div id="errMsg">Kunne ikke få adgang til kameraet.</div></div>
+</div>
+
+<div class="controls" id="controls">
+  <div class="seg" id="sourceSeg"><button data-src="live" class="active">📷 Live</button><button data-src="upload">🖼 Upload billede</button></div>
+  <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select><button class="primary" id="startBtn">Start</button></div>
+  <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
+  <div class="zoomwrap" id="hwZoomWrap" style="display:none"><label>Kamera-zoom</label><input type="range" id="hwZoom"><span id="hwZoomVal">–</span></div>
+  <div class="zoomwrap" id="zoomWrap" style="display:none"><label>Zoom</label><input type="range" id="zoom" min="1" max="5" step="0.1" value="1"><span id="zoomVal">1.0×</span></div>
+
+  <div class="seg" id="calSeg"><button data-cal="manual" class="active">Lineal (2 punkter)</button><button data-cal="marker">Kalibreringsmærke</button></div>
+  <div class="row" id="calManualRow"><label>Kendt længde</label><input type="number" id="refLen" value="10" min="0.1" step="0.1"><select id="refUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="calBtn">Kalibrér</button></div>
+  <div class="row" id="calMarkerRow" style="display:none"><label>Mærkets side</label><input type="number" id="markerSize" value="20" min="1" step="0.5"><select id="markerUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="detectBtn">Detektér</button></div>
+
+  <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active">📏 Måling</button><button data-mode="assess">✓ Vurdering</button></div>
+
+  <div class="card" id="caseCard" style="display:none">
+    <h3>Sag — gælder alle vurderinger</h3>
+    <div class="row"><label>Niveau</label><select id="level" style="flex:0 0 56px;min-width:0"><option>B</option><option selected>C</option><option>D</option></select>
+      <label>Søm</label><select id="weldType" style="flex:0 0 96px;min-width:0"><option value="fillet">Kantsøm</option><option value="butt">Stuksøm</option></select>
+      <label>t</label><input type="number" id="tThk" value="8" min="0.5" step="0.5"></div>
+    <div class="row"><label>Nominel a</label><input type="number" id="nomA" value="4" min="0.5" step="0.5">
+      <label>aA</label><input type="number" id="aARef" value="4" min="0" step="0.1">
+      <button class="ghost" id="useAAbtn" style="flex:0 0 auto;padding:8px 9px;font-size:12px">aA fra måling</button></div>
+    <div class="row"><label>s (stuksøm)</label><input type="number" id="sThk" value="8" min="0.5" step="0.5">
+      <label>b (sømbredde)</label><input type="number" id="bWid" value="8" min="0.5" step="0.5"></div>
+  </div>
+
+  <div class="seg" id="ctxSeg" style="display:none"><button data-ctx="surface" class="active">Overflade</button><button data-ctx="macro">Makrosnit · indre</button></div>
+  <div class="row"><label id="toolLabel">Måletype</label><select id="faultSelect"></select></div>
+  <label class="chk" id="concaveWrap" style="display:none"><input type="checkbox" id="concave"> Konkav søm (a-estimat ugyldigt)</label>
+
+  <div class="card" id="defectsCard" style="display:none">
+    <h3>Markeringer på dette billede <span style="color:var(--ink-dim);font-weight:400" id="defCount"></span></h3>
+    <div class="dlist" id="dlist"></div>
+  </div>
+
+  <div class="btn-grid"><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>📸 Gem billede</button></div>
+
+  <!-- LAGRING -->
+  <div class="card" id="storeCard">
+    <h3>Lagring</h3>
+    <div class="store-pill" id="storeInfo">—</div>
+    <button class="ghost" id="folderBtn" style="display:none">📁 Vælg mappe på PC</button>
+  </div>
+
+  <!-- SKY-SYNK + LOGIN -->
+  <div class="card" id="syncCard">
+    <h3>Sky-synk (Supabase)</h3>
+    <div id="authRow" style="display:none">
+      <div class="row"><label>Konto</label><select id="sbAcct" style="flex:1"></select></div>
+      <div class="row"><label>E-mail</label><input type="text" id="sbEmail" placeholder="navn@firma.dk" autocomplete="username"></div>
+      <div class="row"><label>Adgangskode</label><input type="password" id="sbPass" placeholder="••••••" autocomplete="current-password"><button class="primary" id="sbLogin" style="flex:0 0 auto">Log ind</button></div>
+    </div>
+    <div id="sessRow" style="display:none">
+      <div class="row"><span class="store-pill" id="sbWho" style="flex:1"></span><button class="ghost" id="sbLogout" style="flex:0 0 auto">Log ud</button></div>
+      <div class="row"><label>Sag-id</label><input type="text" id="sbSag" placeholder="fx ordre-1234"><button class="primary" id="sbConnect" style="flex:0 0 auto">Forbind</button></div>
+    </div>
+    <div class="store-pill" id="sbStatus">Ikke forbundet — lokalt arbejde fungerer uden synk.</div>
+    <div class="note">Log ind med din konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Synk kræver internet ved start.</div>
+  </div>
+
+  <!-- ORG-ADMIN: opret brugere i virksomheden -->
+  <div class="card" id="adminCard" style="display:none">
+    <h3>Brugere i virksomheden (org-admin)</h3>
+    <div class="row"><label>E-mail</label><input type="text" id="auEmail" placeholder="ny.bruger@firma.dk"></div>
+    <div class="row"><label>Kode</label><input type="password" id="auPass" placeholder="min. 6 tegn"><select id="auRole" style="flex:0 0 116px;min-width:0"><option value="member">Bruger</option><option value="org_admin">Org-admin</option></select><button class="primary" id="auCreate" style="flex:0 0 auto">Opret</button></div>
+    <div class="store-pill" id="auStatus"></div>
+    <div class="dlist" id="auList"></div>
+  </div>
+
+  <div class="gallery" id="gallery">
+    <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
+    <div class="mini">Tap et billede for at åbne det, se alle markeringer og trække punkterne. ✕ sletter.</div>
+    <div class="thumbs" id="thumbs"></div>
+    <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent billeder</button><button class="ghost" id="clearGalBtn">Ryd galleri</button></div>
+  </div>
+
+  <div class="card" id="reportCard" style="display:none">
+    <h3>Rapport</h3>
+    <div class="row"><label>Operatør</label><input type="text" id="rpOperator" placeholder="Navn"></div>
+    <div class="row"><label>Emne/WPS</label><input type="text" id="rpJob" placeholder="Emne, ordre eller WPS-nr."></div>
+    <button class="primary" id="reportBtn">📄 Generér rapport</button>
+    <div class="note">Udskriftsklar rapport med separate afsnit for målinger og vurderinger. Browser → Udskriv → Gem som PDF. På PC med valgt mappe gemmes rapporten også der.</div>
+  </div>
+
+  <div class="card" id="appCard">
+    <h3>App</h3>
+    <button class="primary" id="installBtn" style="display:none">⬇ Installér app</button>
+    <div class="mini" id="installHint"></div>
+    <label class="chk"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
+  </div>
+
+  <div class="mini" id="status">Vælg kilde, kalibrér, vælg Måling eller Vurdering, og klik på billedet.</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ===== SUPABASE-PROJEKT — udfyld disse to (Project Settings → API) =====
+  const SB_URL="https://DIN-PROJEKT.supabase.co";   // ← din Project URL
+  const SB_KEY="DIN-ANON-PUBLIC-KEY";               // ← din anon public key (IKKE service_role)
+  const SB_READY = !/DIN-PROJEKT|DIN-ANON/.test(SB_URL+SB_KEY);
+  const $=id=>document.getElementById(id);
+  const video=$("video"),still=$("still"),overlay=$("overlay"),ctx=overlay.getContext("2d"),stage=$("stage");
+  const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+  const isMobile=isTouch&&Math.min(screen.width,screen.height)<820;
+  const hasFS = !isMobile && ('showDirectoryPicker' in window);
+
+  function fmt(mm){return mm>=100?mm.toFixed(1):mm.toFixed(2);}
+  function pick(L,m){return m[L];}function notP(L){return"ikke tilladt ("+L+")";}
+  function verd(val,allow,L,pfx){if(allow==null)return{val,disp:fmt(val)+" mm",ok:false,allowTxt:notP(L)};const ok=val<=allow+1e-9;return{val,disp:fmt(val)+" mm",ok,allowTxt:pfx+allow.toFixed(2)+" mm"};}
+
+  const DEF={
+    m_length:{name:"Længde",kind:"measure",grp:"measure",n:2,mt:"len",eval:v=>({val:v.mm,disp:"L="+fmt(v.mm)+" mm",ok:null})},
+    m_diam:{name:"Diameter",kind:"measure",grp:"measure",n:2,mt:"len",eval:v=>({val:v.mm,disp:"ø"+fmt(v.mm)+" mm",ok:null})},
+    m_leg:{name:"Benlængde (z)",kind:"measure",grp:"measure",n:2,mt:"len",eval:v=>({val:v.mm,disp:"z="+fmt(v.mm)+" mm",ok:null})},
+    m_angle:{name:"Vinkel",kind:"measure",grp:"measure",n:3,mt:"ang",eval:v=>({val:v.deg,disp:v.deg.toFixed(1)+"°",ok:null})},
+    m_p2l:{name:"Punkt → linje",kind:"measure",grp:"measure",n:3,mt:"p2l",eval:v=>({val:v.d,disp:"d⊥="+fmt(v.d)+" mm",ok:null})},
+    amaal:{name:"a-mål (5213/5214)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>evalA(v.mm,P)},
+    zlegs:{name:"a-mål via z-ben",kind:"assess",grp:"surface",n:4,mt:"zlegs",concave:true,eval:(v,P)=>{if(P.concave)return{val:null,disp:"konkav — mål a direkte",ok:null,allowTxt:"estimat ugyldigt"};const a=0.7071*Math.min(v.z1,v.z2);return evalA(a,P,true);}},
+    pore_s:{name:"Overfladepore (2017)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;let allow;if(P.t<=3)allow=pick(P.L,{D:0.3*ref,C:null,B:null});else allow=pick(P.L,{D:Math.min(0.3*ref,3),C:Math.min(0.2*ref,2),B:null});return verd(v.mm,allow,P.L,"d ≤ ");}},
+    undercut:{name:"Sidekærv (5011/5012)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.2*P.t,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.2*P.t,1),C:Math.min(0.1*P.t,0.5),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
+    convex:{name:"Konveks søm (503)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.25*P.b+1,5),C:Math.min(0.15*P.b+1,4),B:Math.min(0.1*P.b+1,3)}),P.L,"h ≤ ")},
+    excess_butt:{name:"Overvulst (502)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.25*P.b+1,10),C:Math.min(0.15*P.b+1,7),B:Math.min(0.1*P.b+1,5)}),P.L,"h ≤ ")},
+    excess_pen:{name:"Gennemløb (504)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.6*P.b+1,C:0.3*P.b+1,B:0.1*P.b+1});else allow=pick(P.L,{D:Math.min(1.0*P.b+1,5),C:Math.min(0.45*P.b+1,4),B:Math.min(0.2*P.b+1,3)});return verd(v.mm,allow,P.L,"h ≤ ");}},
+    unequal:{name:"Ulige ben (512)",kind:"assess",grp:"surface",n:4,mt:"diff",eval:(v,P)=>{const h=Math.abs(v.z1-v.z2);const r=verd(h,pick(P.L,{D:0.2*P.aA+2,C:0.15*P.aA+2,B:0.15*P.aA+1.5}),P.L,"h ≤ ");r.disp="|z1−z2|="+fmt(h)+" mm";return r;}},
+    toe:{name:"Overgangsvinkel (505)",kind:"assess",grp:"surface",n:3,mt:"ang",eval:(v,P)=>{const lim=P.wt==="butt"?pick(P.L,{D:90,C:110,B:150}):pick(P.L,{D:90,C:100,B:110});return{val:v.deg,disp:"α="+v.deg.toFixed(1)+"°",ok:v.deg>=lim,allowTxt:"α ≥ "+lim+"°"};}},
+    overlap:{name:"Overløb (506)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:0.2*P.b,C:null,B:null}),P.L,"h ≤ ")},
+    sagging:{name:"Nedløbet (509)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.25*P.t,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.25*P.t,2),C:Math.min(0.1*P.t,1),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
+    shrink:{name:"Krympefuge (5013)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.1*P.t+0.2,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.2*P.t,2),C:Math.min(0.1*P.t,1),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
+    root_conc:{name:"Indadhvælving rod (515)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.1*P.t+0.2,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.2*P.t,2),C:Math.min(0.1*P.t,1),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
+    root_inc:{name:"Rodfejl 1-sidet stuksøm (4021)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.2*P.t,2),C:null,B:null}),P.L,"h ≤ ")},
+    aA:{name:"aA (sæt reference)",kind:"assess",grp:"macro",n:2,mt:"len",eval:v=>({val:v.mm,disp:"aA="+fmt(v.mm)+" mm",ok:null})},
+    pore_i:{name:"Indre pore (2.3b)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,5),C:Math.min(0.3*ref,4),B:Math.min(0.2*ref,3)}),P.L,"d ≤ ");}},
+    incl:{name:"Indeslutning (2.9)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:Math.min(0.3*ref,3),B:Math.min(0.2*ref,2)}),P.L,"h ≤ ");}},
+    lof:{name:"Bindingsfejl (2.12)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:null,B:null}),P.L,"h ≤ ");}},
+    ip_t:{name:"Rodfejl T-samling (2.13)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.2*P.aA,2),C:null,B:null}),P.L,"h ≤ ")},
+    lack_pen:{name:"Mangl. indtrængning (402)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="butt"?P.s:P.t;return verd(v.mm,pick(P.L,{D:Math.min(0.2*ref,2),C:null,B:null}),P.L,"h ≤ ");}}
+  };
+  function evalA(a,P,est){const dev=a-P.nomA;let allow,ok,typeTxt,allowTxt;
+    if(dev<-1e-9){typeTxt="5213 for lille a";const h=Math.abs(dev);
+      if(P.L==="B"){ok=false;allowTxt="ikke tilladt (B)";}
+      else if(P.t<=3){allow=P.L==="D"?0.1*P.nomA+0.2:0.2;ok=h<=allow+1e-9;allowTxt="−"+allow.toFixed(2)+" mm";}
+      else{const base=0.1*P.nomA+0.3;allow=P.L==="D"?Math.min(base,2):Math.min(base,1);ok=h<=allow+1e-9;allowTxt="−"+allow.toFixed(2)+" mm";}}
+    else if(dev>1e-9){typeTxt="5214 for stort a";if(P.L==="D"){ok=true;allowTxt="tilladt (D)";}else if(P.L==="C"){allow=Math.min(0.2*P.nomA+1,4);ok=dev<=allow+1e-9;allowTxt="+"+allow.toFixed(2)+" mm";}else{allow=Math.min(0.15*P.nomA+1,3);ok=dev<=allow+1e-9;allowTxt="+"+allow.toFixed(2)+" mm";}}
+    else{typeTxt="= nominel";ok=true;allowTxt="—";}
+    return{val:a,disp:(est?"a≈":"a=")+a.toFixed(2)+" mm ("+typeTxt+")",ok,allowTxt};}
+
+  let source="live",stream=null,track=null,haveImage=false;
+  let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
+  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false;
+  let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1;
+  let captures=[],editIndex=-1,prevState=null,markerCorners=null;
+
+  function params(){return{L:$("level").value,wt:$("weldType").value,t:+$("tThk").value||0,nomA:+$("nomA").value||0,aA:+$("aARef").value||0,s:+$("sThk").value||0,b:+$("bWid").value||0,concave:$("concave").checked};}
+
+  /* ============ LAGRING ============ */
+  const DB="makromaal",STORE="captures";
+  function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:"id"});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+  async function idbPut(rec){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put(rec);tx.oncomplete=()=>res();tx.onerror=()=>res();});}catch(e){}}
+  async function idbDel(id){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).delete(id);tx.oncomplete=()=>res();tx.onerror=()=>res();});}catch(e){}}
+  async function idbClear(){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).clear();tx.oncomplete=()=>res();tx.onerror=()=>res();});}catch(e){}}
+  async function idbAll(){try{const db=await idbOpen();return new Promise((res)=>{const tx=db.transaction(STORE,"readonly");const rq=tx.objectStore(STORE).getAll();rq.onsuccess=()=>res(rq.result||[]);rq.onerror=()=>res([]);});}catch(e){return[];}}
+
+  let dirHandle=null;
+  async function chooseFolder(){try{dirHandle=await window.showDirectoryPicker();updateStoreInfo();setStatus("Mappe valgt. Billeder og rapport skrives hertil.");}catch(e){}}
+  async function ensureFolderPerm(){if(!dirHandle)return false;try{const opt={mode:"readwrite"};if((await dirHandle.queryPermission(opt))==="granted")return true;return (await dirHandle.requestPermission(opt))==="granted";}catch(e){return false;}}
+  async function writeToFolder(name,blob){if(!await ensureFolderPerm())return false;try{const fh=await dirHandle.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(blob);await w.close();return true;}catch(e){return false;}}
+  function dataURLtoBlob(u){const a=u.split(",");const m=a[0].match(/:(.*?);/)[1];const bin=atob(a[1]);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:m});}
+
+  function updateStoreInfo(){const el=$("storeInfo");
+    if(isMobile){el.innerHTML="📱 Telefon: billeder gemmes <b>automatisk på enheden</b> og er der næste gang du åbner appen.";$("folderBtn").style.display="none";}
+    else if(hasFS){$("folderBtn").style.display="block";el.innerHTML=dirHandle?("💻 PC: skriver til mappen <b>"+(dirHandle.name||"valgt")+"</b>."):"💻 PC: vælg en mappe, så billeder + rapport skrives direkte til disken.";}
+    else{$("folderBtn").style.display="none";el.innerHTML="💻 PC: denne browser understøtter ikke mappe-valg. Brug <b>Hent billeder</b> / <b>Generér rapport</b> (Chrome/Edge giver mappe-skrivning).";}}
+  $("folderBtn").addEventListener("click",chooseFolder);
+
+  // record = minimal persistent form
+  function toRecord(cap){return{id:cap.id,img:cap.img,W:cap.W,H:cap.H,mmPerPx:cap.mmPerPx,calPts:cap.calPts,marks:cap.marks,params:cap.params};}
+  function fromRecord(rec){const results=rec.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,rec.marks.length,m.pts,rec.mmPerPx),rec.params));
+    return{id:rec.id,img:rec.img,W:rec.W,H:rec.H,mmPerPx:rec.mmPerPx,calPts:rec.calPts,marks:rec.marks,params:rec.params,results,thumb:null};}
+  function valsForPts(type,_n,pts,scale){const mt=DEF[type].mt;
+    if(mt==="ang"){const[a,b,c]=pts;const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};const dd=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));return{deg:Math.acos(Math.max(-1,Math.min(1,dd)))*180/Math.PI};}
+    if(mt==="p2l")return{d:perp(pts[2],pts[0],pts[1])*scale};
+    if(mt==="zlegs"||mt==="diff")return{z1:dist(pts[0],pts[1])*scale,z2:dist(pts[2],pts[3])*scale};
+    return{mm:dist(pts[0],pts[1])*scale};}
+
+  /* ============ tilstand / fejltype ============ */
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;
+    $("caseCard").style.display=mode==="assess"?"flex":"none";$("ctxSeg").style.display=mode==="assess"?"flex":"none";$("toolLabel").textContent=mode==="assess"?"Fejltype":"Måletype";placing=[];fillFaults();setHint();draw();}));
+  document.querySelectorAll("#ctxSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#ctxSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");ctxMode=b.dataset.ctx;placing=[];fillFaults();setHint();draw();}));
+  function fillFaults(){const sel=$("faultSelect");sel.innerHTML="";const grp=mode==="measure"?"measure":ctxMode;
+    Object.keys(DEF).filter(k=>DEF[k].grp===grp).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=DEF[k].name;sel.appendChild(o);});
+    fault=sel.value;$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";}
+  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
+
+  /* ============ KILDE ============ */
+  document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();}));
+  function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
+    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";}newImage();setHint();}
+  function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
+
+  /* ============ KAMERA ============ */
+  async function listCameras(){try{const t=await navigator.mediaDevices.getUserMedia({video:true});t.getTracks().forEach(x=>x.stop());}catch(e){}
+    const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");const sel=$("camSelect");sel.innerHTML="";
+    if(!devs.length){sel.innerHTML="<option>Ingen kameraer</option>";return;}devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});
+    const ext=[...sel.options].find(o=>/usb|hd|netum|booth|document|cam|back|rear/i.test(o.textContent)&&!/front|face|truedepth/i.test(o.textContent));if(ext)sel.value=ext.value;}
+  async function startCamera(deviceId){stopCamera();showErr(false);still.style.display="none";video.style.display="block";
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:deviceId?{exact:deviceId}:undefined,facingMode:deviceId?undefined:{ideal:"environment"},width:{ideal:3840},height:{ideal:2160}},audio:false});}
+    catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:deviceId?{deviceId:{exact:deviceId}}:true,audio:false});}catch(e2){showErr(true,e2.message||"Adgang nægtet");return;}}
+    video.srcObject=stream;track=stream.getVideoTracks()[0];await video.play().catch(()=>{});$("liveDot").classList.add("live");$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;requestWake();setupHwZoom();refreshCams();requestAnimationFrame(loop);setHint();}
+  function setupHwZoom(){const w=$("hwZoomWrap");try{const c=track.getCapabilities?track.getCapabilities():{};if(c&&c.zoom&&c.zoom.max>c.zoom.min){const s=$("hwZoom");s.min=c.zoom.min;s.max=c.zoom.max;s.step=c.zoom.step||((c.zoom.max-c.zoom.min)/50);const cur=track.getSettings().zoom||c.zoom.min;s.value=cur;$("hwZoomVal").textContent=(+cur).toFixed(1)+"×";w.style.display="flex";s.oninput=async()=>{try{await track.applyConstraints({advanced:[{zoom:+s.value}]});$("hwZoomVal").textContent=(+s.value).toFixed(1)+"×";}catch(e){}};return;}}catch(e){}w.style.display="none";}
+  async function refreshCams(){const cur=$("camSelect").value;const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");if(devs.some(d=>d.label)){const sel=$("camSelect");sel.innerHTML="";devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});if(cur)sel.value=cur;}}
+  function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;}$("liveDot").classList.remove("live");}
+
+  $("fileInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);still.onload=()=>{haveImage=true;still.style.display="block";video.style.display="none";$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;newImage();syncCanvas();draw();setHint();};still.src=url;});
+
+  /* ============ CANVAS ============ */
+  let mr={x:0,y:0,w:0,h:0,sx:1};
+  function mediaSize(){if((source==="upload"||editIndex>=0)&&still.naturalWidth)return{w:still.naturalWidth,h:still.naturalHeight};return{w:video.videoWidth,h:video.videoHeight};}
+  function syncCanvas(){const r=stage.getBoundingClientRect();overlay.width=Math.round(r.width*dpr);overlay.height=Math.round(r.height*dpr);overlay.style.width=r.width+"px";overlay.style.height=r.height+"px";
+    const{w:vw,h:vh}=mediaSize();if(vw&&vh){const cw=overlay.width,ch=overlay.height;const sc=Math.min(cw/vw,ch/vh)*zoom;mr={x:(cw-vw*sc)/2,y:(ch-vh*sc)/2,w:vw*sc,h:vh*sc,sx:sc};const el=(source==="upload"||editIndex>=0)?still:video;el.style.transform=zoom>1?`scale(${zoom})`:"none";}}
+  function loop(){syncCanvas();draw();if(stream&&source==="live"&&editIndex<0)requestAnimationFrame(loop);}
+  function v2c(p){return{x:mr.x+p.x*mr.sx,y:mr.y+p.y*mr.sx};}
+  function c2v(cx,cy){return{x:(cx*dpr-mr.x)/mr.sx,y:(cy*dpr-mr.y)/mr.sx};}
+  function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
+  function cvv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+  function foot(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;return{x:a.x+t*dx,y:a.y+t*dy};}
+  function perp(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy)||1;return Math.abs((p.x-a.x)*dy-(p.y-a.y)*dx)/L;}
+  function valsFor(type,pts){return valsForPts(type,DEF[type].n,pts,mmPerPx);}
+  function evalMark(m){return DEF[m.type].eval(valsFor(m.type,m.pts),params());}
+
+  function colorFor(def,ok){if(def.kind==="measure")return cvv("--cyan");return ok===true?cvv("--green"):ok===false?cvv("--red"):cvv("--amber");}
+  function draw(){ctx.clearRect(0,0,overlay.width,overlay.height);
+    if(calPts.length===2)segLine(calPts[0],calPts[1],cvv("--green"),"ref");
+    if(markerCorners){ctx.strokeStyle=cvv("--green");ctx.lineWidth=2*dpr;ctx.setLineDash([6*dpr,4*dpr]);ctx.beginPath();markerCorners.forEach((p,i)=>{const c=v2c(p);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y);});ctx.closePath();ctx.stroke();ctx.setLineDash([]);markerCorners.forEach(p=>{const c=v2c(p);ctx.beginPath();ctx.arc(c.x,c.y,5*dpr,0,7);ctx.fillStyle=cvv("--green");ctx.fill();});}
+    marks.forEach((m,i)=>drawMark(m,i+1));
+    if(placing.length){const col=cvv("--violet");const d=DEF[fault];
+      if(d.mt==="p2l"){if(placing.length>=2)rawline(placing[0],placing[1],col);}
+      else if(d.n===3){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length===3)rawline(placing[1],placing[2],col);}
+      else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
+      else if(placing.length>=2)rawline(placing[0],placing[1],col);
+      placing.forEach(p=>handle(v2c(p),col));}}
+  function drawMark(m,num){const r=evalMark(m);const def=DEF[m.type];const col=colorFor(def,r.ok);const p=m.pts;
+    if(def.mt==="p2l"){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);const a=v2c(p[2]),b=v2c(f);ctx.strokeStyle=col;ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);label(v2c(p[2]),tag(num,r),col);}}
+    else if(def.n===3){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){rawline(p[1],p[2],col);label(v2c(p[1]),tag(num,r),col);}}
+    else if(def.n===4){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=4){rawline(p[2],p[3],col);label(v2c(p[0]),tag(num,r),col);}}
+    else{rawline(p[0],p[1],col);label(v2c(p[0]),tag(num,r),col);}
+    p.forEach(pt=>handle(v2c(pt),col));}
+  function tag(num,r){return num+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");}
+  function rawline(P,Q,col){const a=v2c(P),b=v2c(Q);ctx.strokeStyle=col;ctx.lineWidth=2.5*dpr;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();cap(a,b,col);cap(b,a,col);}
+  function segLine(P,Q,col,t){const a=v2c(P),b=v2c(Q);ctx.strokeStyle=col;ctx.lineWidth=2.5*dpr;ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();cap(a,b,col);cap(b,a,col);if(t==="ref")label({x:(a.x+b.x)/2,y:(a.y+b.y)/2},"ref",col);}
+  function handle(p,col){ctx.beginPath();ctx.arc(p.x,p.y,7*dpr,0,7);ctx.fillStyle="rgba(13,17,23,.6)";ctx.fill();ctx.lineWidth=2.5*dpr;ctx.strokeStyle=col;ctx.stroke();ctx.beginPath();ctx.arc(p.x,p.y,2*dpr,0,7);ctx.fillStyle=col;ctx.fill();}
+  function cap(from,to,col){const ang=Math.atan2(to.y-from.y,to.x-from.x)+Math.PI/2,len=7*dpr;ctx.strokeStyle=col;ctx.lineWidth=2.5*dpr;ctx.beginPath();ctx.moveTo(from.x-Math.cos(ang)*len,from.y-Math.sin(ang)*len);ctx.lineTo(from.x+Math.cos(ang)*len,from.y+Math.sin(ang)*len);ctx.stroke();}
+  function label(c,txt,col){ctx.font=`${12*dpr}px Segoe UI, sans-serif`;const w=ctx.measureText(txt).width+10*dpr;ctx.fillStyle="rgba(13,17,23,.85)";rr(c.x-w/2,c.y-24*dpr,w,17*dpr,5*dpr);ctx.fill();ctx.fillStyle=col;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(txt,c.x,c.y-15*dpr);}
+  function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+  /* ============ INTERAKTION ============ */
+  function ready(){return editIndex>=0||(source==="live"&&stream)||(source==="upload"&&haveImage);}
+  function getXY(e){const r=overlay.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  function hitTest(cx,cy){const tol=18;for(let di=0;di<marks.length;di++){const arr=marks[di].pts;for(let i=0;i<arr.length;i++){const cp=v2c(arr[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr,idx:i,mark:marks[di]};}}for(let i=0;i<placing.length;i++){const cp=v2c(placing[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:placing,idx:i};}for(let i=0;i<calPts.length;i++){const cp=v2c(calPts[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:calPts,idx:i,cal:true};}return null;}
+  function down(e){if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
+    if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
+    if(!mmPerPx){setStatus("Kalibrér først.");return;}
+    placing.push(c2v(x,y));if(placing.length===DEF[fault].n){const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};marks.push(m);placing=[];renderMarks();showResult(m);}draw();}
+  function move(e){if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
+  function up(){drag=null;}
+  overlay.addEventListener("mousedown",down);overlay.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
+  overlay.addEventListener("touchstart",down,{passive:false});overlay.addEventListener("touchmove",move,{passive:false});window.addEventListener("touchend",up);
+  function showResult(m){const r=evalMark(m);const ro=$("readout");const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+DEF[m.type].name+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
+  function renderMarks(){const card=$("defectsCard"),list=$("dlist");card.style.display=marks.length?"flex":"none";$("defCount").textContent=marks.length?("("+marks.length+")"):"";$("undoBtn").disabled=!(marks.length||placing.length);list.innerHTML="";
+    marks.forEach((m,i)=>{const r=evalMark(m);const dot=m.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const row=document.createElement("div");row.className="ditem";
+      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${i+1}. ${DEF[m.type].name}</span><span class="vl">${r.disp}</span><button data-i="${i}">✕</button>`;
+      row.querySelector("button").addEventListener("click",()=>{marks.splice(i,1);renderMarks();draw();});list.appendChild(row);});}
+
+  /* ============ KALIBRERING ============ */
+  document.querySelectorAll("#calSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#calSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");calMode=b.dataset.cal;$("calManualRow").style.display=calMode==="manual"?"flex":"none";$("calMarkerRow").style.display=calMode==="marker"?"flex":"none";}));
+  function setScale(){const refMm=+$("refLen").value*+$("refUnit").value;const px=dist(calPts[0],calPts[1]);if(px>2&&refMm>0){mmPerPx=refMm/px;showScale();renderMarks();}}
+  function finishCal(){setScale();calibrating=false;$("calBtn").classList.remove("on");setStatus("Kalibreret. Vælg tilstand og klik på billedet.");setHint();}
+  function showScale(){$("scaleBadge").innerHTML=`<b>${(1/mmPerPx).toFixed(1)}</b> px/mm`;}
+  $("calBtn").addEventListener("click",()=>{if(!ready())return;calPts=[];calibrating=true;$("calBtn").classList.add("on");setStatus("Sæt to punkter på den kendte afstand.");setHint();draw();});
+  $("refLen").addEventListener("input",()=>{if(calPts.length===2){setScale();draw();}});
+  $("refUnit").addEventListener("change",()=>{if(calPts.length===2){setScale();draw();}});
+
+  $("detectBtn").addEventListener("click",()=>{if(!ready())return;if(source==="upload"||editIndex>=0){const r=detectOnce();if(r)applyMarker(r,1);else setStatus("Mærke ikke fundet.");return;}
+    const samples=[];let n=0;setStatus("Detekterer over flere billeder…");const iv=setInterval(()=>{const r=detectOnce();if(r)samples.push(r);n++;if(n>=6){clearInterval(iv);if(samples.length<2){setStatus("Mærke ikke fundet stabilt. Brug solidt mørkt kvadrat på lys baggrund eller lineal.");return;}const sides=samples.map(s=>s.sidePx).sort((a,b)=>a-b);const med=sides[sides.length>>1];const best=samples.reduce((p,c)=>Math.abs(c.sidePx-med)<Math.abs(p.sidePx-med)?c:p);applyMarker(best,samples.length);}},180);});
+  function detectOnce(){const{w:W,h:H}=mediaSize();if(!W)return null;const maxW=900,sc=Math.min(1,maxW/W),w=Math.round(W*sc),h=Math.round(H*sc);const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.drawImage((source==="upload"||editIndex>=0)?still:video,0,0,w,h);
+    const img=g.getImageData(0,0,w,h).data,gray=new Uint8Array(w*h),hist=new Array(256).fill(0);for(let i=0,p=0;i<img.length;i+=4,p++){const v=(img[i]*.299+img[i+1]*.587+img[i+2]*.114)|0;gray[p]=v;hist[v]++;}
+    const tot=w*h;let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let sB=0,wB=0,mv=0,thr=128;for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=tot-wB;if(!wF)break;sB+=i*hist[i];const mB=sB/wB,mF=(sum-sB)/wF,vb=wB*wF*(mB-mF)*(mB-mF);if(vb>mv){mv=vb;thr=i;}}
+    let n=0;for(let p=0;p<gray.length;p++)if(gray[p]<thr)n++;if(n<w*h*.005)return null;let pp=[{s:-1e9},{s:1e9},{s:-1e9},{s:1e9}];for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(gray[y*w+x]>=thr)continue;const su=x+y,di=x-y;if(su>pp[0].s)pp[0]={s:su,x,y};if(su<pp[1].s)pp[1]={s:su,x,y};if(di>pp[2].s)pp[2]={s:di,x,y};if(di<pp[3].s)pp[3]={s:di,x,y};}
+    const corners=[pp[1],pp[3],pp[0],pp[2]].map(o=>({x:o.x/sc,y:o.y/sc}));const sidePx=(dist(corners[0],corners[1])+dist(corners[1],corners[2])+dist(corners[2],corners[3])+dist(corners[3],corners[0]))/4;if(sidePx<10)return null;return{corners,sidePx};}
+  function applyMarker(r,nS){const sideMm=+$("markerSize").value*+$("markerUnit").value;if(!(sideMm>0))return;mmPerPx=sideMm/r.sidePx;showScale();markerCorners=r.corners;calPts=[];renderMarks();setStatus("Mærke detekteret ("+(nS>1?nS+" billeder, ":"")+r.sidePx.toFixed(0)+" px = "+sideMm+" mm). Kontrollér de 4 punkter; ellers lineal.");draw();}
+
+  ["level","weldType","tThk","nomA","aARef","sThk","bWid","concave"].forEach(id=>$(id).addEventListener("input",()=>{renderMarks();draw();}));
+  $("useAAbtn").addEventListener("click",()=>{const last=[...marks].reverse().find(m=>m.type==="aA");if(last){$("aARef").value=(dist(last.pts[0],last.pts[1])*mmPerPx).toFixed(2);renderMarks();draw();setStatus("aA sat fra seneste aA-måling.");}else setStatus("Mål aA først (Vurdering → Makrosnit → aA).");});
+  $("undoBtn").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
+
+  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?"Tryk <b>Start</b>":"Vælg et billede";h.style.display="block";return;}
+    if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
+    const d=DEF[fault];let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
+  function setStatus(t){$("status").innerHTML=t;}
+  function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
+
+  /* ============ CAPTURE ============ */
+  function rawDataURL(){const{w:W,h:H}=mediaSize();const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage((source==="upload"||editIndex>=0)?still:video,0,0,W,H);return{url:c.toDataURL("image/jpeg",.85),W,H};}
+  function annotate(g,cap){const lw=Math.max(3,cap.W/700);const ln=(P,Q,col)=>{g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([]);g.beginPath();g.moveTo(P.x,P.y);g.lineTo(Q.x,Q.y);g.stroke();[P,Q].forEach(pt=>{g.beginPath();g.arc(pt.x,pt.y,lw*2,0,7);g.fillStyle=col;g.fill();});};
+    if(cap.calPts&&cap.calPts.length===2)ln(cap.calPts[0],cap.calPts[1],"#2ea043");g.font="bold "+Math.max(20,cap.W/50)+"px Segoe UI, sans-serif";g.textAlign="left";
+    cap.marks.forEach((m,i)=>{const r=cap.results[i];const def=DEF[m.type];const col=def.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const p=m.pts;
+      if(def.mt==="p2l"){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[2].x,p[2].y);g.lineTo(f.x,f.y);g.stroke();g.setLineDash([]);}}
+      else if(def.n===3){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3)ln(p[1],p[2],col);}
+      else if(def.n===4){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=4)ln(p[2],p[3],col);}
+      else ln(p[0],p[1],col);
+      const a=p[0];const t=(i+1)+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);});}
+  function makeThumb(cap,cb){const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=cap.W;c.height=cap.H;const g=c.getContext("2d");g.drawImage(im,0,0);annotate(g,cap);cb(c.toDataURL("image/jpeg",.8));};im.src=cap.img;}
+  function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
+
+  async function persistCapture(cap){
+    if(isMobile){idbPut(toRecord(cap));}
+    else if(hasFS&&dirHandle){const ok=await writeToFolder("makro-"+cap.id+".jpg",dataURLtoBlob(cap.thumb||cap.img));setStatus(ok?("Billede skrevet til mappen ("+marks.length+" markeringer)."):"Kunne ikke skrive til mappen — tjek tilladelse.");}
+    sbUpload(cap);
+  }
+  $("snapBtn").addEventListener("click",()=>{const{w}=mediaSize();if(!w)return;if(!marks.length){setStatus("Ingen markeringer endnu.");return;}
+    const cap=buildCapture();captures.push(cap);renderGallery();
+    makeThumb(cap,u=>{cap.thumb=u;renderGallery();persistCapture(cap);});
+    if(!isMobile&&!(hasFS&&dirHandle))setStatus("Billede gemt i galleriet. Vælg evt. en mappe for at skrive til disk, eller brug Hent billeder.");});
+
+  function renderGallery(){const g=$("gallery"),t=$("thumbs");g.classList.toggle("show",captures.length>0);$("reportCard").style.display=captures.length>0?"flex":"none";$("galCount").textContent=captures.length;t.innerHTML="";
+    captures.forEach((cap,i)=>{const fail=cap.results.some(r=>r.ok===false);const hasV=cap.results.some(r=>r.ok!=null);const dot=hasV?(fail?'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#f85149"></span>':'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#2ea043"></span>'):'';
+      const d=document.createElement("div");d.className="thumb";d.innerHTML=`<img src="${cap.thumb||cap.img}"><button class="tx" data-i="${i}">✕</button>${dot}<div class="tlabel">${cap.marks.length} mark.</div>`;
+      d.querySelector("img").addEventListener("click",()=>openEditor(i));d.querySelector(".tx").addEventListener("click",ev=>{ev.stopPropagation();const idx=+ev.target.dataset.i;const id=captures[idx].id;captures.splice(idx,1);if(isMobile)idbDel(id);sbDelete(id);knownIds.delete(id);renderGallery();});t.appendChild(d);});}
+  $("downloadAllBtn").addEventListener("click",()=>{captures.forEach((cap,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=cap.thumb||cap.img;a.download="makro-"+(i+1)+".jpg";a.click();},i*350));});
+  $("clearGalBtn").addEventListener("click",()=>{captures=[];if(isMobile)idbClear();renderGallery();});
+
+  /* ============ ÅBN / REDIGÉR ============ */
+  function openEditor(i){const cap=captures[i];editIndex=i;prevState={source,zoom,calPts,marks,mmPerPx,fault,mode,ctxMode};if(stream)stopCamera();
+    still.onload=()=>{still.style.display="block";video.style.display="none";mmPerPx=cap.mmPerPx;calPts=cap.calPts.map(p=>({x:p.x,y:p.y}));marks=cap.marks.map(m=>({type:m.type,kind:m.kind||DEF[m.type].kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));markerCorners=null;zoom=1;$("zoom").value=1;$("zoomVal").textContent="1.0×";placing=[];applyParams(cap.params);if(mmPerPx)showScale();$("editbar").classList.add("show");$("snapBtn").disabled=true;setStatus("Redigerer — træk i punkterne. Tryk Gem ændringer.");renderMarks();syncCanvas();draw();};still.src=cap.img;}
+  function applyParams(P){$("level").value=P.L;$("weldType").value=P.wt;$("tThk").value=P.t;$("nomA").value=P.nomA;$("aARef").value=P.aA;$("sThk").value=P.s;$("bWid").value=P.b;$("concave").checked=!!P.concave;}
+  $("saveEditBtn").addEventListener("click",()=>{if(editIndex<0)return;const cap=captures[editIndex];const P=params();cap.mmPerPx=mmPerPx;cap.calPts=calPts.map(p=>({x:p.x,y:p.y}));cap.marks=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));cap.params=P;cap.results=cap.marks.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));
+    makeThumb(cap,u=>{cap.thumb=u;renderGallery();if(isMobile)idbPut(toRecord(cap));else if(hasFS&&dirHandle)writeToFolder("makro-"+cap.id+".jpg",dataURLtoBlob(u));});sbUpdate(cap);closeEditor();});
+  $("closeEditBtn").addEventListener("click",closeEditor);
+  function closeEditor(){editIndex=-1;$("editbar").classList.remove("show");$("snapBtn").disabled=false;if(prevState){source=prevState.source;zoom=prevState.zoom;$("zoom").value=zoom;$("zoomVal").textContent=zoom.toFixed(1)+"×";calPts=prevState.calPts;marks=prevState.marks;mmPerPx=prevState.mmPerPx;fault=prevState.fault;mode=prevState.mode;ctxMode=prevState.ctxMode;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.toggle("active",x.dataset.src===source));}still.src="";switchSource();if(source==="live"){still.style.display="none";video.style.display="block";}setStatus("Redigering lukket.");setHint();renderMarks();syncCanvas();draw();}
+
+  /* ============ RAPPORT ============ */
+  function buildReportHTML(){const op=$("rpOperator").value||"—",job=$("rpJob").value||"—",date=new Date().toLocaleString("da-DK");
+    let mRows="",aRows="",imgs="",nA=0,nFail=0,nM=0;
+    captures.forEach((c,ci)=>{c.marks.forEach((m,i)=>{const r=c.results[i];const def=DEF[m.type];
+      if(def.kind==="measure"){nM++;mRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${r.disp}</td></tr>`;}
+      else{nA++;if(r.ok===false)nFail++;const vd=r.ok===true?'<span style="color:#1a7f37;font-weight:700">OK</span>':r.ok===false?'<span style="color:#cf222e;font-weight:700">AFVIST</span>':'—';aRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${c.params.wt==="fillet"?"Kantsøm":"Stuksøm"}</td><td>${c.params.L}</td><td>${r.disp}</td><td>${r.allowTxt||"—"}</td><td>${vd}</td></tr>`;}});
+      imgs+=`<figure><img src="${c.thumb||c.img}"><figcaption>Billede ${ci+1} — ${c.marks.length} markeringer</figcaption></figure>`;});
+    const concl=nA?(nFail>0?`<span style="color:#cf222e;font-weight:700">${nFail} af ${nA} vurderinger afvist</span>`:`<span style="color:#1a7f37;font-weight:700">Alle ${nA} vurderinger OK</span>`):"ingen vurderinger";
+    const mSec=nM?`<h2>Målinger</h2><table><thead><tr><th>#</th><th>Type</th><th>Værdi</th></tr></thead><tbody>${mRows}</tbody></table>`:"";
+    const aSec=nA?`<h2>Vurderinger (ISO 5817:2023)</h2><table><thead><tr><th>#</th><th>Fejltype</th><th>Søm</th><th>Niveau</th><th>Målt</th><th>Grænse</th><th>Vurdering</th></tr></thead><tbody>${aRows}</tbody></table>`:"";
+    return `<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><title>Målerapport</title><style>
+body{font-family:Segoe UI,Arial,sans-serif;color:#111;margin:32px}h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#444;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:24px}
+.meta{font-size:13px;margin-bottom:6px}.meta b{color:#000}table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}th{background:#f0f0f0}
+figure{display:inline-block;width:31%;margin:1%;vertical-align:top}img{width:100%;border:1px solid #ccc;border-radius:4px}figcaption{font-size:11px;color:#333}.foot{margin-top:22px;font-size:10px;color:#777;border-top:1px solid #ccc;padding-top:6px}@media print{button{display:none}}</style></head><body>
+<h1>WeldGauge — målerapport</h1>
+<div class="meta"><b>Operatør:</b> ${op} · <b>Emne/WPS:</b> ${job} · <b>Dato:</b> ${date}</div>
+<div class="meta"><b>Standard:</b> ISO 5817:2023 · <b>Billeder:</b> ${captures.length} · <b>Målinger:</b> ${nM} · <b>Vurderinger:</b> ${nA} · <b>Konklusion:</b> ${concl}</div>
+<button onclick="window.print()" style="margin:10px 0;padding:8px 14px">Udskriv / Gem som PDF</button>
+${mSec}${aSec}<h2>Billeder</h2>${imgs}
+<div class="foot">Genereret med WeldGauge. Skala kalibreret med reference i billedplan. a-mål og indre fejl vurderes på makrosnit; z-baseret a er estimat (kun ikke-konkave kantsømme). Verificér mod kontrolleret standardkopi før endelig dokumentation.</div></body></html>`;}
+  $("reportBtn").addEventListener("click",()=>{const rdy=captures.map(c=>new Promise(res=>{if(c.thumb)res();else makeThumb(c,u=>{c.thumb=u;res();});}));
+    Promise.all(rdy).then(async()=>{const html=buildReportHTML();
+      if(!isMobile&&hasFS&&dirHandle){const ok=await writeToFolder("maalerapport.html",new Blob([html],{type:"text/html"}));setStatus(ok?"Rapport skrevet til mappen som maalerapport.html.":"Kunne ikke skrive rapport til mappen.");}
+      const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}else if(!(hasFS&&dirHandle)){const b=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="maalerapport.html";a.click();}});});
+
+  $("startBtn").addEventListener("click",()=>{startCamera($("camSelect").value||null);$("startBtn").textContent="Genstart";});
+  $("camSelect").addEventListener("change",()=>{if(stream)startCamera($("camSelect").value);});
+  $("zoom").addEventListener("input",e=>{zoom=+e.target.value;$("zoomVal").textContent=zoom.toFixed(1)+"×";if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
+  window.addEventListener("resize",()=>{dpr=Math.max(1,window.devicePixelRatio||1);if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
+
+  /* ============ SKY-SYNK + LOGIN (Supabase, virksomheds-model) ============ */
+  let sb=null,sbSag=null,sbChan=null,knownIds=new Set(),sbUser=null,sbOrg=null,sbOrgName="",sbRole="member";
+  try{$("sbSag").value=localStorage.getItem("mm_sbSag")||"";}catch(e){}
+  function sbStatus(t,ok){const el=$("sbStatus");el.innerHTML=t;el.style.color=ok?"var(--green)":"var(--ink-dim)";}
+  function blobToDataURL(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
+  function setSyncPill(){const p=$("syncPill");if(!p)return;if(sbChan&&sbUser)p.innerHTML="🟢 Synk"+(sbRole==="org_admin"?" (admin)":"");else if(sbUser)p.innerHTML="🟡 Logget ind";else p.innerHTML="⚪ Offline";}
+  function rememberEmail(em){if(!em)return;try{let l=JSON.parse(localStorage.getItem("mm_emails")||"[]");if(!l.includes(em)){l.push(em);localStorage.setItem("mm_emails",JSON.stringify(l));}}catch(e){}}
+  function fillAccts(){try{const l=JSON.parse(localStorage.getItem("mm_emails")||"[]");const s=$("sbAcct");s.innerHTML="";l.forEach(e=>{const o=document.createElement("option");o.value=e;o.textContent=e;s.appendChild(o);});const o=document.createElement("option");o.value="";o.textContent="➕ Ny e-mail…";s.appendChild(o);if(l.length&&!$("sbEmail").value)$("sbEmail").value=l[0];}catch(e){}}
+  $("sbAcct").addEventListener("change",e=>{$("sbEmail").value=e.target.value;$("sbPass").value="";});
+
+  function sbInitClient(){
+    if(!SB_READY){sbStatus("Projekt-credentials mangler i koden (SB_URL / SB_KEY).");return false;}
+    if(typeof supabase==="undefined"||!supabase.createClient){sbStatus("Supabase-bibliotek ikke indlæst (kræver internet).");return false;}
+    sb=supabase.createClient(SB_URL,SB_KEY);
+    sb.auth.onAuthStateChange((_ev,session)=>applySession(session));
+    sb.auth.getSession().then(({data})=>applySession(data.session));
+    return true;}
+
+  async function applySession(session){sbUser=session?session.user:null;
+    if(sbUser){
+      try{const{data}=await sb.from("profiles").select("org_id,role").eq("id",sbUser.id).single();sbOrg=data?data.org_id:null;sbRole=(data&&data.role)||"member";}catch(e){sbOrg=null;sbRole="member";}
+      sbOrgName="";
+      if(sbOrg){try{const{data}=await sb.from("organizations").select("name").eq("id",sbOrg).single();sbOrgName=data?data.name:"";}catch(e){}}
+      rememberEmail(sbUser.email);
+    }else{sbOrg=null;sbRole="member";}
+    updateAuthUI();setSyncPill();}
+  function updateAuthUI(){const ready=!!sb;$("authRow").style.display=(ready&&!sbUser)?"block":"none";$("sessRow").style.display=(ready&&sbUser)?"block":"none";
+    $("adminCard").style.display=(sbUser&&sbRole==="org_admin")?"flex":"none";
+    if(sbUser)$("sbWho").innerHTML="Logget ind som <b>"+sbUser.email+"</b>"+(sbOrgName?" · "+sbOrgName:"")+(sbRole==="org_admin"?" (org-admin)":"")+(!sbOrg?' <span style="color:var(--red)">— ingen virksomhed tildelt</span>':"");
+    if(ready&&!sbUser)fillAccts();
+    if(sbUser&&sbRole==="org_admin")renderOrgUsers();}
+  async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
+    sbStatus("Logger ind…");const{error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error){sbStatus("Login-fejl: "+error.message);return;}$("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);}
+  $("sbLogin").addEventListener("click",sbLogin);
+  $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
+  async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
+  $("sbLogout").addEventListener("click",sbLogout);
+
+  function canSee(row){return sbOrg&&row.org_id===sbOrg;}
+  async function sbConnect(){if(!sb||!sbUser){sbStatus("Log ind først.");return;}if(!sbOrg){sbStatus("Din bruger er ikke tildelt en virksomhed. Kontakt din org-admin.");return;}
+    const sag=$("sbSag").value.trim();if(!sag){sbStatus("Udfyld Sag-id.");return;}try{localStorage.setItem("mm_sbSag",sag);}catch(e){}
+    try{if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}sbSag=sag;knownIds=new Set(captures.map(c=>c.id));sbStatus("Forbinder…");
+      const{data,error}=await sb.from("maalinger").select("*").eq("sag",sag).order("created_at",{ascending:true});if(error){sbStatus("Fejl: "+error.message);return;}
+      for(const row of (data||[]))await sbIngest(row);
+      sbChan=sb.channel("mm-"+sbOrg+"-"+sag).on("postgres_changes",{event:"*",schema:"public",table:"maalinger",filter:"sag=eq."+sag},payload=>{
+        if(payload.eventType==="INSERT"||payload.eventType==="UPDATE")sbIngest(payload.new);
+        else if(payload.eventType==="DELETE"&&payload.old){const id=payload.old.id;const i=captures.findIndex(c=>c.id===id);if(i>=0){captures.splice(i,1);knownIds.delete(id);renderGallery();}}
+      }).subscribe();
+      setSyncPill();sbStatus("Forbundet til sag '"+sag+"'. "+((data||[]).length)+" billeder. Nye deles automatisk i virksomheden.",true);}catch(e){sbStatus("Forbindelsesfejl: "+(e.message||e));}}
+  async function sbIngest(row){if(!canSee(row))return;
+    if(knownIds.has(row.id)){const cap=captures.find(c=>c.id===row.id);if(cap){cap.marks=row.marks||[];cap.params=row.params||{};cap.mmPerPx=row.mm_per_px;cap.calPts=row.cal_pts||[];cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));makeThumb(cap,u=>{cap.thumb=u;renderGallery();});}return;}
+    knownIds.add(row.id);
+    try{const{data,error}=await sb.storage.from("makro").download(row.img_path);if(error||!data)return;const url=await blobToDataURL(data);
+      const cap={id:row.id,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
+      cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));
+      captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});renderGallery();}catch(e){}}
+  async function sbUpload(cap){if(!sb||!sbSag||!sbUser||!sbOrg)return;try{const path=sbOrg+"/"+sbSag+"/"+cap.id+".jpg";knownIds.add(cap.id);
+    await sb.storage.from("makro").upload(path,dataURLtoBlob(cap.img),{contentType:"image/jpeg",upsert:true});
+    await sb.from("maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params});
+  }catch(e){sbStatus("Upload-fejl: "+(e.message||e));}}
+  async function sbUpdate(cap){if(!sb||!sbSag||!sbUser)return;try{await sb.from("maalinger").update({marks:cap.marks,params:cap.params,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts}).eq("id",cap.id);}catch(e){}}
+  async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
+  $("sbConnect").addEventListener("click",sbConnect);
+
+  /* ----- org-admin: opret + vis brugere ----- */
+  async function createUser(){const email=$("auEmail").value.trim(),password=$("auPass").value,role=$("auRole").value;
+    if(!email||password.length<6){$("auStatus").textContent="E-mail og kode (min. 6 tegn) kræves.";return;}
+    $("auStatus").textContent="Opretter…";
+    try{const{data:{session}}=await sb.auth.getSession();
+      const res=await fetch(SB_URL+"/functions/v1/create-user",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(session?session.access_token:""),"apikey":SB_KEY},body:JSON.stringify({email,password,role})});
+      const j=await res.json();
+      if(!res.ok){$("auStatus").textContent="Fejl: "+(j.error||res.status);return;}
+      $("auStatus").textContent="Oprettet: "+email;$("auEmail").value="";$("auPass").value="";renderOrgUsers();
+    }catch(e){$("auStatus").textContent="Fejl: "+(e.message||e);}}
+  $("auCreate").addEventListener("click",createUser);
+  async function renderOrgUsers(){if(!sb||!sbOrg)return;try{const{data}=await sb.from("profiles").select("email,role").eq("org_id",sbOrg).order("email",{ascending:true});
+    const list=$("auList");list.innerHTML="";(data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
+      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
+
+  if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
+  setSyncPill();
+
+  /* ============ INIT ============ */
+  // --- Installation (PWA) ---
+  let deferredPrompt=null;
+  const standalone=window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$("installBtn").style.display="flex";$("installHint").textContent="Installér for at få appen på hjemmeskærm/skrivebord.";});
+  $("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();try{await deferredPrompt.userChoice;}catch(e){}deferredPrompt=null;$("installBtn").style.display="none";});
+  window.addEventListener('appinstalled',()=>{$("installBtn").style.display="none";$("installHint").textContent="✓ App installeret.";});
+  if(standalone){$("appCard").querySelector("h3").textContent="App ✓ installeret";$("installHint").textContent="Kører som app.";}
+  else if(isIOS){$("installHint").innerHTML="På iPhone/iPad: tryk <b>Del</b>-knappen → <b>Føj til hjemmeskærm</b>.";}
+
+  // --- Hold skærmen tændt (ingen dvale) ---
+  let wakeLock=null;
+  async function requestWake(){if(!$("wakeToggle").checked)return;if(!('wakeLock'in navigator))return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}catch(e){}}
+  function releaseWake(){if(wakeLock){try{wakeLock.release();}catch(e){}wakeLock=null;}}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')requestWake();});
+  $("wakeToggle").addEventListener("change",()=>{if($("wakeToggle").checked)requestWake();else releaseWake();});
+  window.addEventListener('pointerdown',()=>requestWake(),{once:true});
+  if(!('wakeLock'in navigator)){$("wakeToggle").parentElement.style.opacity=".5";$("wakeToggle").disabled=true;$("wakeToggle").nextSibling&&($("wakeToggle").parentElement.title="Ikke understøttet i denne browser");}
+
+  fillFaults();updateStoreInfo();
+  if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showErr(true,"Browseren understøtter ikke kameraadgang. Brug Upload eller HTTPS.");}else{listCameras();navigator.mediaDevices.addEventListener?.("devicechange",refreshCams);}
+  // gendan gemte billeder på telefon
+  if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
+  if(!isMobile){document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));document.querySelector('#sourceSeg button[data-src="upload"]').classList.add("active");source="upload";switchSource();setStatus("PC: vælg et billede — eller skift til <b>Live</b>. Vælg en mappe for at gemme til disk.");}
+  else setStatus("Telefon: <b>Live</b> eller <b>Upload</b>. Billeder gemmes automatisk på enheden.");
+})();
+</script>
+</body>
+</html>
