@@ -57,6 +57,17 @@
   .seg button{flex:1;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px}
   .seg button:last-child{border-right:none}.seg button.active{background:var(--cyan);color:#04181b}
   .seg.mode button.active{background:var(--violet);color:#160a26}
+  .seg.mode{border-width:2px}
+  .seg.mode button{padding:13px 4px;font-size:15px;font-weight:700}
+  /* hovedmenu (dropdown) */
+  .menubtn{background:transparent;border:1px solid var(--line);border-radius:7px;padding:7px 11px;font-size:18px;cursor:pointer;color:var(--ink);line-height:1}
+  .menupanel{position:absolute;top:48px;right:8px;width:min(380px,94vw);max-height:78vh;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;z-index:30;
+    display:none;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+  .menupanel.show{display:flex}
+  .menupanel h2{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink-dim);margin:4px 0 0}
+  .menuback{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:29;display:none}
+  .menuback.show{display:block}
   .mini{font-size:11px;color:var(--ink-dim);line-height:1.45}.mini b{color:var(--ink)}
   .zoomwrap{display:flex;align-items:center;gap:8px;width:100%}
   .zoomwrap input[type=range]{flex:1;accent-color:var(--cyan)}
@@ -86,7 +97,8 @@
 </style>
 </head>
 <body>
-<header><span class="dot" id="liveDot"></span><h1>WeldGauge</h1><span class="spacer"></span><span class="scale-badge" id="syncPill" style="margin-right:10px">⚪ Offline</span><span class="scale-badge" id="scaleBadge">Ikke kalibreret</span></header>
+<header><span class="dot" id="liveDot"></span><h1>WeldGauge</h1><span class="spacer"></span><span class="scale-badge" id="syncPill" style="margin-right:10px">⚪ Offline</span><span class="scale-badge" id="scaleBadge" style="margin-right:10px">Ikke kalibreret</span><button class="menubtn" id="menuBtn" title="Menu">☰</button></header>
+<div class="menuback" id="menuBack"></div>
 
 <div class="stage" id="stage">
   <video id="video" playsinline autoplay muted></video>
@@ -98,17 +110,70 @@
 </div>
 
 <div class="controls" id="controls">
-  <div class="seg" id="sourceSeg"><button data-src="live" class="active">📷 Live</button><button data-src="upload">🖼 Upload billede</button></div>
-  <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select><button class="primary" id="startBtn">Start</button></div>
-  <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
+  <!-- ===== HOVEDMENU (☰) — kilde, gem/eksport, indstillinger ===== -->
+  <div class="menupanel" id="menuPanel">
+    <h2>Kilde</h2>
+    <div class="seg" id="sourceSeg"><button data-src="live" class="active">📷 Live kamera</button><button data-src="upload">🖼 Upload billede</button></div>
+    <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select></div>
+    <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
+
+    <h2>Gem &amp; eksport</h2>
+    <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent alle billeder</button></div>
+    <div class="card" id="reportCard" style="display:none">
+      <h3>Rapport</h3>
+      <div class="row"><label>Operatør</label><input type="text" id="rpOperator" placeholder="Navn"></div>
+      <div class="row"><label>Emne/WPS</label><input type="text" id="rpJob" placeholder="Emne, ordre eller WPS-nr."></div>
+      <button class="primary" id="reportBtn">📄 Generér rapport</button>
+      <div class="note">Udskriftsklar rapport med separate afsnit for målinger og vurderinger. Browser → Udskriv → Gem som PDF. På PC med valgt mappe gemmes rapporten også der.</div>
+    </div>
+
+    <h2>Lagring</h2>
+    <div class="card" id="storeCard">
+      <div class="store-pill" id="storeInfo">—</div>
+      <button class="ghost" id="folderBtn" style="display:none">📁 Vælg mappe på PC</button>
+      <button class="ghost" id="clearGalBtn">🗑 Ryd galleri</button>
+    </div>
+
+    <h2>Sky-synk (Supabase)</h2>
+    <div class="card" id="syncCard">
+      <div id="authRow" style="display:none">
+        <div class="row"><label>Konto</label><select id="sbAcct" style="flex:1"></select></div>
+        <div class="row"><label>E-mail</label><input type="text" id="sbEmail" placeholder="navn@firma.dk" autocomplete="username"></div>
+        <div class="row"><label>Adgangskode</label><input type="password" id="sbPass" placeholder="••••••" autocomplete="current-password"><button class="primary" id="sbLogin" style="flex:0 0 auto">Log ind</button></div>
+      </div>
+      <div id="sessRow" style="display:none">
+        <div class="row"><span class="store-pill" id="sbWho" style="flex:1"></span><button class="ghost" id="sbLogout" style="flex:0 0 auto">Log ud</button></div>
+        <div class="row"><label>Sag-id</label><input type="text" id="sbSag" placeholder="fx ordre-1234"><button class="primary" id="sbConnect" style="flex:0 0 auto">Forbind</button></div>
+      </div>
+      <div class="store-pill" id="sbStatus">Ikke forbundet — lokalt arbejde fungerer uden synk.</div>
+      <div class="note">Log ind med din konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Synk kræver internet ved start.</div>
+    </div>
+
+    <div class="card" id="adminCard" style="display:none">
+      <h3>Brugere i virksomheden (org-admin)</h3>
+      <div class="row"><label>E-mail</label><input type="text" id="auEmail" placeholder="ny.bruger@firma.dk"></div>
+      <div class="row"><label>Kode</label><input type="password" id="auPass" placeholder="min. 6 tegn"><select id="auRole" style="flex:0 0 116px;min-width:0"><option value="member">Bruger</option><option value="org_admin">Org-admin</option></select><button class="primary" id="auCreate" style="flex:0 0 auto">Opret</button></div>
+      <div class="store-pill" id="auStatus"></div>
+      <div class="dlist" id="auList"></div>
+    </div>
+
+    <h2>App</h2>
+    <div class="card" id="appCard">
+      <button class="primary" id="installBtn" style="display:none">⬇ Installér app</button>
+      <div class="mini" id="installHint"></div>
+      <label class="chk"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
+    </div>
+  </div>
+
+  <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
+  <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active">📏 Måling</button><button data-mode="assess">✓ Vurdering</button></div>
+
   <div class="zoomwrap" id="hwZoomWrap" style="display:none"><label>Kamera-zoom</label><input type="range" id="hwZoom"><span id="hwZoomVal">–</span></div>
   <div class="zoomwrap" id="zoomWrap" style="display:none"><label>Zoom</label><input type="range" id="zoom" min="1" max="5" step="0.1" value="1"><span id="zoomVal">1.0×</span></div>
 
   <div class="seg" id="calSeg"><button data-cal="manual" class="active">Lineal (2 punkter)</button><button data-cal="marker">Kalibreringsmærke</button></div>
   <div class="row" id="calManualRow"><label>Kendt længde</label><input type="number" id="refLen" value="10" min="0.1" step="0.1"><select id="refUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="calBtn">Kalibrér</button></div>
   <div class="row" id="calMarkerRow" style="display:none"><label>Mærkets side</label><input type="number" id="markerSize" value="20" min="1" step="0.5"><select id="markerUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="detectBtn">Detektér</button></div>
-
-  <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active">📏 Måling</button><button data-mode="assess">✓ Vurdering</button></div>
 
   <div class="card" id="caseCard" style="display:none">
     <h3>Sag — gælder alle vurderinger</h3>
@@ -133,61 +198,13 @@
 
   <div class="btn-grid"><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>📸 Gem billede</button></div>
 
-  <!-- LAGRING -->
-  <div class="card" id="storeCard">
-    <h3>Lagring</h3>
-    <div class="store-pill" id="storeInfo">—</div>
-    <button class="ghost" id="folderBtn" style="display:none">📁 Vælg mappe på PC</button>
-  </div>
-
-  <!-- SKY-SYNK + LOGIN -->
-  <div class="card" id="syncCard">
-    <h3>Sky-synk (Supabase)</h3>
-    <div id="authRow" style="display:none">
-      <div class="row"><label>Konto</label><select id="sbAcct" style="flex:1"></select></div>
-      <div class="row"><label>E-mail</label><input type="text" id="sbEmail" placeholder="navn@firma.dk" autocomplete="username"></div>
-      <div class="row"><label>Adgangskode</label><input type="password" id="sbPass" placeholder="••••••" autocomplete="current-password"><button class="primary" id="sbLogin" style="flex:0 0 auto">Log ind</button></div>
-    </div>
-    <div id="sessRow" style="display:none">
-      <div class="row"><span class="store-pill" id="sbWho" style="flex:1"></span><button class="ghost" id="sbLogout" style="flex:0 0 auto">Log ud</button></div>
-      <div class="row"><label>Sag-id</label><input type="text" id="sbSag" placeholder="fx ordre-1234"><button class="primary" id="sbConnect" style="flex:0 0 auto">Forbind</button></div>
-    </div>
-    <div class="store-pill" id="sbStatus">Ikke forbundet — lokalt arbejde fungerer uden synk.</div>
-    <div class="note">Log ind med din konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Synk kræver internet ved start.</div>
-  </div>
-
-  <!-- ORG-ADMIN: opret brugere i virksomheden -->
-  <div class="card" id="adminCard" style="display:none">
-    <h3>Brugere i virksomheden (org-admin)</h3>
-    <div class="row"><label>E-mail</label><input type="text" id="auEmail" placeholder="ny.bruger@firma.dk"></div>
-    <div class="row"><label>Kode</label><input type="password" id="auPass" placeholder="min. 6 tegn"><select id="auRole" style="flex:0 0 116px;min-width:0"><option value="member">Bruger</option><option value="org_admin">Org-admin</option></select><button class="primary" id="auCreate" style="flex:0 0 auto">Opret</button></div>
-    <div class="store-pill" id="auStatus"></div>
-    <div class="dlist" id="auList"></div>
-  </div>
-
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
     <div class="mini">Billeder slettes automatisk efter 30 dage (⏳ tæller ned). ⤓ gemmer på enheden · 📌 beholder permanent · ✕ sletter. Tap billedet for at åbne og redigere.</div>
     <div class="thumbs" id="thumbs"></div>
-    <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent billeder</button><button class="ghost" id="clearGalBtn">Ryd galleri</button></div>
   </div>
 
-  <div class="card" id="reportCard" style="display:none">
-    <h3>Rapport</h3>
-    <div class="row"><label>Operatør</label><input type="text" id="rpOperator" placeholder="Navn"></div>
-    <div class="row"><label>Emne/WPS</label><input type="text" id="rpJob" placeholder="Emne, ordre eller WPS-nr."></div>
-    <button class="primary" id="reportBtn">📄 Generér rapport</button>
-    <div class="note">Udskriftsklar rapport med separate afsnit for målinger og vurderinger. Browser → Udskriv → Gem som PDF. På PC med valgt mappe gemmes rapporten også der.</div>
-  </div>
-
-  <div class="card" id="appCard">
-    <h3>App</h3>
-    <button class="primary" id="installBtn" style="display:none">⬇ Installér app</button>
-    <div class="mini" id="installHint"></div>
-    <label class="chk"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
-  </div>
-
-  <div class="mini" id="status">Vælg kilde, kalibrér, vælg Måling eller Vurdering, og klik på billedet.</div>
+  <div class="mini" id="status">Kameraet starter automatisk. Kalibrér, vælg Måling eller Vurdering, og klik på billedet. Kilde og indstillinger ligger i ☰-menuen.</div>
 </div>
 
 <script>
@@ -292,9 +309,9 @@
   $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
 
   /* ============ KILDE ============ */
-  document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();}));
+  document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
-    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";}newImage();setHint();}
+    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";startCamera($("camSelect").value||null);}newImage();setHint();}
   function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
 
   /* ============ KAMERA ============ */
@@ -495,8 +512,11 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       if(!isMobile&&hasFS&&dirHandle){const ok=await writeToFolder("maalerapport.html",new Blob([html],{type:"text/html"}));setStatus(ok?"Rapport skrevet til mappen som maalerapport.html.":"Kunne ikke skrive rapport til mappen.");}
       const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}else if(!(hasFS&&dirHandle)){const b=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="maalerapport.html";a.click();}});});
 
-  $("startBtn").addEventListener("click",()=>{startCamera($("camSelect").value||null);$("startBtn").textContent="Genstart";});
-  $("camSelect").addEventListener("change",()=>{if(stream)startCamera($("camSelect").value);});
+  $("camSelect").addEventListener("change",()=>{if(source==="live")startCamera($("camSelect").value);});
+  // ☰ hovedmenu
+  function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
+  $("menuBtn").addEventListener("click",()=>toggleMenu());
+  $("menuBack").addEventListener("click",()=>toggleMenu(false));
   $("zoom").addEventListener("input",e=>{zoom=+e.target.value;$("zoomVal").textContent=zoom.toFixed(1)+"×";if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
   window.addEventListener("resize",()=>{dpr=Math.max(1,window.devicePixelRatio||1);if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
 
@@ -607,8 +627,10 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showErr(true,"Browseren understøtter ikke kameraadgang. Brug Upload eller HTTPS.");}else{listCameras();navigator.mediaDevices.addEventListener?.("devicechange",refreshCams);}
   // gendan gemte billeder på telefon
   if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();pruneExpired();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
-  if(!isMobile){document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));document.querySelector('#sourceSeg button[data-src="upload"]').classList.add("active");source="upload";switchSource();setStatus("PC: vælg et billede — eller skift til <b>Live</b>. Vælg en mappe for at gemme til disk.");}
-  else setStatus("Telefon: <b>Live</b> eller <b>Upload</b>. Billeder gemmes automatisk på enheden.");
+  // Live er standard på alle platforme; kameraet starter automatisk
+  source="live";switchSource();
+  if(!isMobile)setStatus("Kameraet kører. Kalibrér, vælg Måling/Vurdering, og klik. Kilde, gem og indstillinger ligger i ☰-menuen øverst.");
+  else setStatus("Kameraet kører. Kalibrér og mål. Kilde og indstillinger ligger i ☰-menuen.");
 })();
 </script>
 </body>
