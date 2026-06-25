@@ -97,7 +97,7 @@
 </style>
 </head>
 <body>
-<header><span class="dot" id="liveDot"></span><h1>WeldGauge</h1><span class="spacer"></span><span class="scale-badge" id="syncPill" style="margin-right:10px">⚪ Offline</span><span class="scale-badge" id="scaleBadge" style="margin-right:10px">Ikke kalibreret</span><button class="menubtn" id="menuBtn" title="Menu">☰</button></header>
+<header><span class="dot" id="liveDot"></span><h1>WeldGauge</h1><span class="spacer"></span><span class="scale-badge" id="syncPill" style="margin-right:10px">⚪ Ikke logget ind</span><span class="scale-badge" id="scaleBadge" style="margin-right:10px">Ikke kalibreret</span><button class="menubtn" id="menuBtn" title="Menu">☰</button></header>
 <div class="menuback" id="menuBack"></div>
 
 <div class="stage" id="stage">
@@ -134,7 +134,7 @@
       <button class="ghost" id="clearGalBtn">🗑 Ryd galleri</button>
     </div>
 
-    <h2>Sky-synk (Supabase)</h2>
+    <h2>Log ind</h2>
     <div class="card" id="syncCard">
       <div id="authRow" style="display:none">
         <div class="row"><label>Konto</label><select id="sbAcct" style="flex:1"></select></div>
@@ -145,8 +145,8 @@
         <div class="row"><span class="store-pill" id="sbWho" style="flex:1"></span><button class="ghost" id="sbLogout" style="flex:0 0 auto">Log ud</button></div>
         <div class="row"><label>Sag-id</label><input type="text" id="sbSag" placeholder="fx ordre-1234"><button class="primary" id="sbConnect" style="flex:0 0 auto">Forbind</button></div>
       </div>
-      <div class="store-pill" id="sbStatus">Ikke forbundet — lokalt arbejde fungerer uden synk.</div>
-      <div class="note">Log ind med din konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Synk kræver internet ved start.</div>
+      <div class="store-pill" id="sbStatus">Ikke logget ind — lokal måling fungerer uden login.</div>
+      <div class="note">Log ind med din WeldGauge-konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Login kræver internet.</div>
     </div>
 
     <div class="card" id="adminCard" style="display:none">
@@ -525,14 +525,14 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   try{$("sbSag").value=localStorage.getItem("mm_sbSag")||"";}catch(e){}
   function sbStatus(t,ok){const el=$("sbStatus");el.innerHTML=t;el.style.color=ok?"var(--green)":"var(--ink-dim)";}
   function blobToDataURL(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
-  function setSyncPill(){const p=$("syncPill");if(!p)return;if(sbChan&&sbUser)p.innerHTML="🟢 Synk"+(sbRole==="org_admin"?" (admin)":"");else if(sbUser)p.innerHTML="🟡 Logget ind";else p.innerHTML="⚪ Offline";}
+  function setSyncPill(){const p=$("syncPill");if(!p)return;if(sbChan&&sbUser)p.innerHTML="🟢 Forbundet"+(sbRole==="org_admin"?" (admin)":"");else if(sbUser)p.innerHTML="🟡 Logget ind";else p.innerHTML="⚪ Ikke logget ind";}
   function rememberEmail(em){if(!em)return;try{let l=JSON.parse(localStorage.getItem("mm_emails")||"[]");if(!l.includes(em)){l.push(em);localStorage.setItem("mm_emails",JSON.stringify(l));}}catch(e){}}
   function fillAccts(){try{const l=JSON.parse(localStorage.getItem("mm_emails")||"[]");const s=$("sbAcct");s.innerHTML="";l.forEach(e=>{const o=document.createElement("option");o.value=e;o.textContent=e;s.appendChild(o);});const o=document.createElement("option");o.value="";o.textContent="➕ Ny e-mail…";s.appendChild(o);if(l.length&&!$("sbEmail").value)$("sbEmail").value=l[0];}catch(e){}}
   $("sbAcct").addEventListener("change",e=>{$("sbEmail").value=e.target.value;$("sbPass").value="";});
 
   function sbInitClient(){
     if(!SB_READY){sbStatus("Projekt-credentials mangler i koden (SB_URL / SB_KEY).");return false;}
-    if(typeof supabase==="undefined"||!supabase.createClient){sbStatus("Supabase-bibliotek ikke indlæst (kræver internet).");return false;}
+    if(typeof supabase==="undefined"||!supabase.createClient){sbStatus("Login kræver internet — du er offline lige nu. Lokal måling virker stadig.");return false;}
     sb=supabase.createClient(SB_URL,SB_KEY);
     sb.auth.onAuthStateChange((_ev,session)=>applySession(session));
     sb.auth.getSession().then(({data})=>applySession(data.session));
