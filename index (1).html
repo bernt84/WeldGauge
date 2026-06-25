@@ -194,9 +194,9 @@
 (function(){
   "use strict";
   // ===== SUPABASE-PROJEKT — udfyld disse to (Project Settings → API) =====
-  const SB_URL="https://DIN-PROJEKT.supabase.co";   // ← din Project URL
-  const SB_KEY="DIN-ANON-PUBLIC-KEY";               // ← din anon public key (IKKE service_role)
-  const SB_READY = !/DIN-PROJEKT|DIN-ANON/.test(SB_URL+SB_KEY);
+  const SB_URL="https://lpalbtbpnhqnbixcnutq.supabase.co";
+  const SB_KEY="sb_publishable_eNPz7BmzMfoXNYVfX7DVSQ_q0o2xA_H";
+  const SB_READY = /^https?:\/\//.test(SB_URL) && SB_KEY.length>20;
   const $=id=>document.getElementById(id);
   const video=$("video"),still=$("still"),overlay=$("overlay"),ctx=overlay.getContext("2d"),stage=$("stage");
   const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
@@ -486,9 +486,9 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
 
   async function applySession(session){sbUser=session?session.user:null;
     if(sbUser){
-      try{const{data}=await sb.from("profiles").select("org_id,role").eq("id",sbUser.id).single();sbOrg=data?data.org_id:null;sbRole=(data&&data.role)||"member";}catch(e){sbOrg=null;sbRole="member";}
+      try{const{data}=await sb.from("wg_profiles").select("org_id,role").eq("id",sbUser.id).single();sbOrg=data?data.org_id:null;sbRole=(data&&data.role)||"member";}catch(e){sbOrg=null;sbRole="member";}
       sbOrgName="";
-      if(sbOrg){try{const{data}=await sb.from("organizations").select("name").eq("id",sbOrg).single();sbOrgName=data?data.name:"";}catch(e){}}
+      if(sbOrg){try{const{data}=await sb.from("wg_organizations").select("name").eq("id",sbOrg).single();sbOrgName=data?data.name:"";}catch(e){}}
       rememberEmail(sbUser.email);
     }else{sbOrg=null;sbRole="member";}
     updateAuthUI();setSyncPill();}
@@ -508,9 +508,9 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   async function sbConnect(){if(!sb||!sbUser){sbStatus("Log ind først.");return;}if(!sbOrg){sbStatus("Din bruger er ikke tildelt en virksomhed. Kontakt din org-admin.");return;}
     const sag=$("sbSag").value.trim();if(!sag){sbStatus("Udfyld Sag-id.");return;}try{localStorage.setItem("mm_sbSag",sag);}catch(e){}
     try{if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}sbSag=sag;knownIds=new Set(captures.map(c=>c.id));sbStatus("Forbinder…");
-      const{data,error}=await sb.from("maalinger").select("*").eq("sag",sag).order("created_at",{ascending:true});if(error){sbStatus("Fejl: "+error.message);return;}
+      const{data,error}=await sb.from("wg_maalinger").select("*").eq("sag",sag).order("created_at",{ascending:true});if(error){sbStatus("Fejl: "+error.message);return;}
       for(const row of (data||[]))await sbIngest(row);
-      sbChan=sb.channel("mm-"+sbOrg+"-"+sag).on("postgres_changes",{event:"*",schema:"public",table:"maalinger",filter:"sag=eq."+sag},payload=>{
+      sbChan=sb.channel("mm-"+sbOrg+"-"+sag).on("postgres_changes",{event:"*",schema:"public",table:"wg_maalinger",filter:"sag=eq."+sag},payload=>{
         if(payload.eventType==="INSERT"||payload.eventType==="UPDATE")sbIngest(payload.new);
         else if(payload.eventType==="DELETE"&&payload.old){const id=payload.old.id;const i=captures.findIndex(c=>c.id===id);if(i>=0){captures.splice(i,1);knownIds.delete(id);renderGallery();}}
       }).subscribe();
@@ -518,16 +518,16 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   async function sbIngest(row){if(!canSee(row))return;
     if(knownIds.has(row.id)){const cap=captures.find(c=>c.id===row.id);if(cap){cap.marks=row.marks||[];cap.params=row.params||{};cap.mmPerPx=row.mm_per_px;cap.calPts=row.cal_pts||[];cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));makeThumb(cap,u=>{cap.thumb=u;renderGallery();});}return;}
     knownIds.add(row.id);
-    try{const{data,error}=await sb.storage.from("makro").download(row.img_path);if(error||!data)return;const url=await blobToDataURL(data);
+    try{const{data,error}=await sb.storage.from("wg-makro").download(row.img_path);if(error||!data)return;const url=await blobToDataURL(data);
       const cap={id:row.id,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
       cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));
       captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});renderGallery();}catch(e){}}
   async function sbUpload(cap){if(!sb||!sbSag||!sbUser||!sbOrg)return;try{const path=sbOrg+"/"+sbSag+"/"+cap.id+".jpg";knownIds.add(cap.id);
-    await sb.storage.from("makro").upload(path,dataURLtoBlob(cap.img),{contentType:"image/jpeg",upsert:true});
-    await sb.from("maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params});
+    await sb.storage.from("wg-makro").upload(path,dataURLtoBlob(cap.img),{contentType:"image/jpeg",upsert:true});
+    await sb.from("wg_maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params});
   }catch(e){sbStatus("Upload-fejl: "+(e.message||e));}}
-  async function sbUpdate(cap){if(!sb||!sbSag||!sbUser)return;try{await sb.from("maalinger").update({marks:cap.marks,params:cap.params,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts}).eq("id",cap.id);}catch(e){}}
-  async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
+  async function sbUpdate(cap){if(!sb||!sbSag||!sbUser)return;try{await sb.from("wg_maalinger").update({marks:cap.marks,params:cap.params,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts}).eq("id",cap.id);}catch(e){}}
+  async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("wg_maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("wg-makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
   $("sbConnect").addEventListener("click",sbConnect);
 
   /* ----- org-admin: opret + vis brugere ----- */
@@ -541,7 +541,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       $("auStatus").textContent="Oprettet: "+email;$("auEmail").value="";$("auPass").value="";renderOrgUsers();
     }catch(e){$("auStatus").textContent="Fejl: "+(e.message||e);}}
   $("auCreate").addEventListener("click",createUser);
-  async function renderOrgUsers(){if(!sb||!sbOrg)return;try{const{data}=await sb.from("profiles").select("email,role").eq("org_id",sbOrg).order("email",{ascending:true});
+  async function renderOrgUsers(){if(!sb||!sbOrg)return;try{const{data}=await sb.from("wg_profiles").select("email,role").eq("org_id",sbOrg).order("email",{ascending:true});
     const list=$("auList");list.innerHTML="";(data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
       row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
 
