@@ -35,6 +35,7 @@
   #fsBar{display:none}
   body.fs #fsBar{display:flex;flex-wrap:wrap;justify-content:center;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:55;gap:8px;background:rgba(13,17,23,.82);border:1px solid var(--line);border-radius:12px;padding:8px;max-width:94vw}
   body.fs #fsBar button{min-height:0;padding:10px 16px;font-size:18px}
+  #fsGrip{display:flex;align-items:center;padding:0 8px;color:var(--ink-dim);font-size:20px;cursor:grab;user-select:none;touch-action:none}
   body.fs #fsBar select{min-height:0;padding:8px 6px;font-size:13px;max-width:140px;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:7px}
   #fsMode{flex:0 0 auto}
   video,img#still,canvas#overlay{position:absolute;inset:0;width:100%;height:100%}
@@ -58,6 +59,14 @@
     .controls{max-height:none;overflow:visible}
     body.fs{overflow:hidden}
     body.fs .stage{position:fixed!important;inset:0!important;height:100%!important;width:100%!important;z-index:50}
+  }
+  @media (max-width:920px) and (orientation:landscape){
+    html,body{height:100%;overflow:hidden}
+    body{display:flex;flex-direction:row;flex-wrap:wrap}
+    header{flex:0 0 100%}
+    .stage{position:relative;height:calc(100% - 52px);flex:1 1 60%;min-width:0}
+    .controls{height:calc(100% - 52px);max-height:none;flex:1 1 40%;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    body.fs .stage{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;z-index:50}
   }
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .row label{font-size:12px;color:var(--ink-dim);white-space:nowrap}
@@ -126,7 +135,7 @@
   <div class="hint" id="hint">Vælg kilde nedenfor</div>
   <div class="readout" id="readout"></div>
   <div class="err" id="err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8.5l4-3v13l-4-3v-7zM6 5.5h11a2 2 0 012 2v9a2 2 0 01-2 2H6"/><line x1="3" y1="3" x2="21" y2="21" stroke-width="2"/></svg><div id="errMsg">Kunne ikke få adgang til kameraet.</div></div>
-  <div id="fsBar"><select id="fsMode" title="Tilstand"><option value="measure">📏</option><option value="assess">✓</option></select><select id="fsFault" title="Måletype"></select><button class="ghost" id="fsCal">📏</button><button class="ghost" id="fsFreeze">📷</button><button class="ghost" id="fsUndo">↶</button><button class="ghost" id="fsSave">⤓</button><button class="ghost" id="fsCopy">📋</button><button class="primary" id="fsSnap">💾</button></div>
+  <div id="fsBar"><span id="fsGrip" title="Træk for at flytte">⠿</span><select id="fsMode" title="Tilstand"><option value="measure">📏</option><option value="assess">✓</option></select><select id="fsFault" title="Måletype"></select><button class="ghost" id="fsCal">📏</button><button class="ghost" id="fsFreeze">📷</button><button class="ghost" id="fsUndo">↶</button><button class="ghost" id="fsSave">⤓</button><button class="ghost" id="fsCopy">📋</button><button class="primary" id="fsSnap">💾</button></div>
 </div>
 
 <div class="controls" id="controls">
@@ -199,7 +208,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.9.4 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.10.0 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -429,7 +438,19 @@
     still.src=c.toDataURL("image/jpeg",.92);}
   function unfreeze(){frozen=false;still.style.display="none";video.style.display="block";still.src="";marks=[];placing=[];$("freezeBtn").textContent="📷 Tag billede";renderMarks();setHint();syncCanvas();draw();if(stream)requestAnimationFrame(loop);}
   $("freezeBtn").addEventListener("click",()=>{if(source!=="live")return;if(frozen)unfreeze();else freezeFrame();});
-  function toggleFs(on){const v=on===undefined?!document.body.classList.contains("fs"):on;document.body.classList.toggle("fs",v);$("fsBtn").textContent=v?"✕":"⛶";setTimeout(()=>{syncCanvas();draw();},60);}
+  function toggleFs(on){const v=on===undefined?!document.body.classList.contains("fs"):on;document.body.classList.toggle("fs",v);$("fsBtn").textContent=v?"✕":"⛶";if(v)restoreFsBarPos();setTimeout(()=>{syncCanvas();draw();},60);}
+  // --- trækbar fuldskærms-bjælke ---
+  function restoreFsBarPos(){try{const p=JSON.parse(localStorage.getItem("wg_fsbar")||"null");const bar=$("fsBar");if(p&&typeof p.x==="number"){bar.style.left=p.x+"px";bar.style.top=p.y+"px";bar.style.bottom="auto";bar.style.transform="none";}}catch(e){}}
+  (function makeFsBarDraggable(){const bar=$("fsBar");if(!bar)return;let st=null;
+    function start(e){if(e.target.closest("button,select"))return; // lad knapper/dropdowns virke
+      const t=e.touches?e.touches[0]:e;const r=bar.getBoundingClientRect();st={dx:t.clientX-r.left,dy:t.clientY-r.top};bar.style.transition="none";e.preventDefault();}
+    function move(e){if(!st)return;const t=e.touches?e.touches[0]:e;let x=t.clientX-st.dx,y=t.clientY-st.dy;
+      x=Math.max(4,Math.min(window.innerWidth-bar.offsetWidth-4,x));y=Math.max(4,Math.min(window.innerHeight-bar.offsetHeight-4,y));
+      bar.style.left=x+"px";bar.style.top=y+"px";bar.style.bottom="auto";bar.style.transform="none";e.preventDefault();}
+    function end(){if(!st)return;st=null;try{const r=bar.getBoundingClientRect();localStorage.setItem("wg_fsbar",JSON.stringify({x:r.left,y:r.top}));}catch(e){}}
+    bar.addEventListener("touchstart",start,{passive:false});bar.addEventListener("touchmove",move,{passive:false});bar.addEventListener("touchend",end);
+    bar.addEventListener("mousedown",start);window.addEventListener("mousemove",move);window.addEventListener("mouseup",end);
+  })();
   $("fsBtn").addEventListener("click",()=>toggleFs());
   $("fsCal").addEventListener("click",()=>$("calBtn").click());
   $("fsFreeze").addEventListener("click",()=>{if(source==="live"){if(frozen)unfreeze();else freezeFrame();}});
@@ -840,7 +861,9 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   $("menuBtn").addEventListener("click",()=>toggleMenu());
   $("menuBack").addEventListener("click",()=>toggleMenu(false));
   $("zoom").addEventListener("input",e=>{setZoom(+e.target.value);});
-  window.addEventListener("resize",()=>{dpr=Math.max(1,window.devicePixelRatio||1);if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
+  function onResize(){dpr=Math.max(1,window.devicePixelRatio||1);syncCanvas();draw();}
+  window.addEventListener("resize",onResize);
+  window.addEventListener("orientationchange",()=>setTimeout(onResize,200));
 
   /* ============ SKY-SYNK + LOGIN (Supabase, virksomheds-model) ============ */
   let sb=null,sbSag=null,sbChan=null,knownIds=new Set(),sbUser=null,sbOrg=null,sbOrgName="",sbRole="member",sbSuper=false,_orgs=[];
