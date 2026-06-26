@@ -153,7 +153,15 @@
     </div>
 
     <div class="card" id="adminCard" style="display:none">
-      <h3>Brugere i virksomheden (org-admin)</h3>
+      <div id="superRow" style="display:none">
+        <h3>Virksomheder (super-admin)</h3>
+        <div class="row"><input type="text" id="orgName" placeholder="Ny virksomhed" style="flex:1"><button class="primary" id="orgCreate" style="flex:0 0 auto">Opret</button></div>
+        <div class="store-pill" id="orgStatus"></div>
+        <div class="dlist" id="orgList"></div>
+        <h3 style="margin-top:6px">Opret bruger</h3>
+      </div>
+      <h3 id="auHeading">Brugere i virksomheden (org-admin)</h3>
+      <div class="row" id="auOrgRow" style="display:none"><label>Virksomhed</label><select id="auOrg" style="flex:1"></select></div>
       <div class="row"><label>E-mail</label><input type="text" id="auEmail" placeholder="ny.bruger@firma.dk"></div>
       <div class="row"><label>Kode</label><input type="password" id="auPass" placeholder="min. 6 tegn"><select id="auRole" style="flex:0 0 116px;min-width:0"><option value="member">Bruger</option><option value="org_admin">Org-admin</option></select><button class="primary" id="auCreate" style="flex:0 0 auto">Opret</button></div>
       <div class="store-pill" id="auStatus"></div>
@@ -541,7 +549,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   window.addEventListener("resize",()=>{dpr=Math.max(1,window.devicePixelRatio||1);if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
 
   /* ============ SKY-SYNK + LOGIN (Supabase, virksomheds-model) ============ */
-  let sb=null,sbSag=null,sbChan=null,knownIds=new Set(),sbUser=null,sbOrg=null,sbOrgName="",sbRole="member";
+  let sb=null,sbSag=null,sbChan=null,knownIds=new Set(),sbUser=null,sbOrg=null,sbOrgName="",sbRole="member",sbSuper=false,_orgs=[];
   try{$("sbSag").value=localStorage.getItem("mm_sbSag")||"";}catch(e){}
   function sbStatus(t,ok){const el=$("sbStatus");el.innerHTML=t;el.style.color=ok?"var(--green)":"var(--ink-dim)";}
   function blobToDataURL(b){return new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b);});}
@@ -560,17 +568,21 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
 
   async function applySession(session){sbUser=session?session.user:null;
     if(sbUser){
-      try{const{data}=await sb.from("wg_profiles").select("org_id,role").eq("id",sbUser.id).single();sbOrg=data?data.org_id:null;sbRole=(data&&data.role)||"member";}catch(e){sbOrg=null;sbRole="member";}
+      try{const{data}=await sb.from("wg_profiles").select("org_id,role,is_superadmin").eq("id",sbUser.id).single();sbOrg=data?data.org_id:null;sbRole=(data&&data.role)||"member";sbSuper=!!(data&&data.is_superadmin);}catch(e){sbOrg=null;sbRole="member";sbSuper=false;}
       sbOrgName="";
       if(sbOrg){try{const{data}=await sb.from("wg_organizations").select("name").eq("id",sbOrg).single();sbOrgName=data?data.name:"";}catch(e){}}
       rememberEmail(sbUser.email);
-    }else{sbOrg=null;sbRole="member";}
-    updateAuthUI();setSyncPill();}
+    }else{sbOrg=null;sbRole="member";sbSuper=false;}
+    updateAuthUI();setSyncPill();if(sbUser&&sbOrg)loadSager();}
   function updateAuthUI(){$("authRow").style.display=(!sbUser)?"block":"none";$("sessRow").style.display=(sbUser)?"block":"none";
-    $("adminCard").style.display=(sbUser&&sbRole==="org_admin")?"flex":"none";
-    if(sbUser)$("sbWho").innerHTML="Logget ind som <b>"+sbUser.email+"</b>"+(sbOrgName?" · "+sbOrgName:"")+(sbRole==="org_admin"?" (org-admin)":"")+(!sbOrg?' <span style="color:var(--red)">— ingen virksomhed tildelt</span>':"");
+    const canAdmin=sbUser&&(sbRole==="org_admin"||sbSuper);
+    $("adminCard").style.display=canAdmin?"flex":"none";
+    $("superRow").style.display=sbSuper?"block":"none";
+    $("auOrgRow").style.display=sbSuper?"flex":"none";
+    $("auHeading").textContent=sbSuper?"Opret bruger (vælg virksomhed)":"Brugere i virksomheden (org-admin)";
+    if(sbUser)$("sbWho").innerHTML="Logget ind som <b>"+sbUser.email+"</b>"+(sbOrgName?" · "+sbOrgName:"")+(sbSuper?" (super-admin)":sbRole==="org_admin"?" (org-admin)":"")+(!sbOrg&&!sbSuper?' <span style="color:var(--red)">— ingen virksomhed tildelt</span>':"");
     if(!sbUser)fillAccts();
-    if(sbUser&&sbRole==="org_admin")renderOrgUsers();}
+    if(canAdmin){renderOrgUsers();if(sbSuper)renderOrgs();}}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
     if(!sb){if(!sbInitClient()){sbStatus("Kan ikke forbinde — tjek internet og prøv igen.");return;}}
     sbStatus("Logger ind…");const{error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error){sbStatus("Login-fejl: "+error.message);return;}$("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);}
@@ -621,20 +633,35 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("wg_maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("wg-makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
   $("sbConnect").addEventListener("click",sbConnect);
 
-  /* ----- org-admin: opret + vis brugere ----- */
+  /* ----- admin: opret virksomheder + brugere ----- */
+  async function callAdmin(payload){const{data:{session}}=await sb.auth.getSession();
+    const res=await fetch(SB_URL+"/functions/v1/wg-admin",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(session?session.access_token:""),"apikey":SB_KEY},body:JSON.stringify(payload)});
+    const j=await res.json().catch(()=>({error:"Ugyldigt svar"}));return{ok:res.ok,j};}
+  async function createOrg(){const name=$("orgName").value.trim();if(!name){$("orgStatus").textContent="Skriv et virksomhedsnavn.";return;}
+    $("orgStatus").textContent="Opretter…";const{ok,j}=await callAdmin({action:"create_org",name});
+    if(!ok){$("orgStatus").textContent="Fejl: "+(j.error||"");return;}$("orgStatus").textContent="Oprettet: "+name;$("orgName").value="";renderOrgs();}
+  $("orgCreate").addEventListener("click",createOrg);
+  async function renderOrgs(){if(!sb)return;try{const{data}=await sb.from("wg_organizations").select("*").order("name",{ascending:true});_orgs=data||[];
+    const list=$("orgList");if(list){list.innerHTML="";_orgs.forEach(o=>{const row=document.createElement("div");row.className="ditem";row.innerHTML=`<span class="nm">${o.name}</span>`;list.appendChild(row);});if(!_orgs.length)list.innerHTML='<div class="mini">Ingen virksomheder endnu.</div>';}
+    const sel=$("auOrg");if(sel){const cur=sel.value;sel.innerHTML="";_orgs.forEach(o=>{const op=document.createElement("option");op.value=o.id;op.textContent=o.name;sel.appendChild(op);});if(cur)sel.value=cur;}
+  }catch(e){}}
   async function createUser(){const email=$("auEmail").value.trim(),password=$("auPass").value,role=$("auRole").value;
     if(!email||password.length<6){$("auStatus").textContent="E-mail og kode (min. 6 tegn) kræves.";return;}
+    const payload={action:"create_user",email,password,role};
+    if(sbSuper){const org=$("auOrg").value;if(!org){$("auStatus").textContent="Vælg en virksomhed.";return;}payload.org_id=org;}
     $("auStatus").textContent="Opretter…";
-    try{const{data:{session}}=await sb.auth.getSession();
-      const res=await fetch(SB_URL+"/functions/v1/create-user",{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+(session?session.access_token:""),"apikey":SB_KEY},body:JSON.stringify({email,password,role})});
-      const j=await res.json();
-      if(!res.ok){$("auStatus").textContent="Fejl: "+(j.error||res.status);return;}
+    try{const{ok,j}=await callAdmin(payload);
+      if(!ok){$("auStatus").textContent="Fejl: "+(j.error||"");return;}
       $("auStatus").textContent="Oprettet: "+email;$("auEmail").value="";$("auPass").value="";renderOrgUsers();
     }catch(e){$("auStatus").textContent="Fejl: "+(e.message||e);}}
   $("auCreate").addEventListener("click",createUser);
-  async function renderOrgUsers(){if(!sb||!sbOrg)return;try{const{data}=await sb.from("wg_profiles").select("email,role").eq("org_id",sbOrg).order("email",{ascending:true});
+  async function renderOrgUsers(){if(!sb)return;try{
+    let q=sb.from("wg_profiles").select("email,role,org_id").order("email",{ascending:true});
+    if(!sbSuper&&sbOrg)q=q.eq("org_id",sbOrg);
+    const{data}=await q;const orgName=id=>{const o=_orgs.find(x=>x.id===id);return o?o.name:"";};
     const list=$("auList");list.innerHTML="";(data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
-      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
+      const on=sbSuper&&u.org_id?(" · "+(orgName(u.org_id)||"")):"";
+      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}${on}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
 
   if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
   updateAuthUI(); // vis login-felter med det samme, også før forbindelse
