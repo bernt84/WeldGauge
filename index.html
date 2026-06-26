@@ -116,6 +116,7 @@
     <h2>Kilde</h2>
     <div class="seg" id="sourceSeg"><button data-src="live" class="active">📷 Live kamera</button><button data-src="upload">🖼 Upload billede</button></div>
     <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select></div>
+    <div class="seg" id="facingSeg" style="display:none"><button data-face="environment" class="active">📷 Bagkamera</button><button data-face="user">🤳 Forkamera</button></div>
     <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
 
     <h2>Gem &amp; eksport</h2>
@@ -281,7 +282,7 @@
 
   let source="live",stream=null,track=null,haveImage=false,frozen=false;
   let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
-  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,capTarget=null,lastAthroat=null;
+  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,capTarget=null,lastAthroat=null,athroatDrag=false;
   let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1;
   let captures=[],editIndex=-1,prevState=null,markerCorners=null;
 
@@ -340,7 +341,10 @@
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
-    if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Tag billede";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
+    if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Tag billede";
+      if(isMobile){$("liveRow").style.display="none";$("facingSeg").style.display="flex";startCamera(null,facing);}
+      else{const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(saved);}
+    }newImage();setHint();}
   function freezeFrame(){const{w:W,h:H}=mediaSize();if(!W||!video.videoWidth)return;const c=document.createElement("canvas");c.width=video.videoWidth;c.height=video.videoHeight;c.getContext("2d").drawImage(video,0,0,c.width,c.height);
     still.onload=()=>{frozen=true;still.style.display="block";video.style.display="none";$("freezeBtn").textContent="🎥 Nyt billede";setHint();syncCanvas();draw();setStatus("Billede taget — mål i ro. Tryk 'Nyt billede' for et nyt.");};
     still.src=c.toDataURL("image/jpeg",.92);}
@@ -355,28 +359,29 @@
     const saved=localStorage.getItem("mm_cam");if(saved&&[...sel.options].some(o=>o.value===saved)){sel.value=saved;return;}
     if(isMobile){const rear=[...sel.options].find(o=>/back|rear|bag|environment/i.test(o.textContent)&&!/front|face|true/i.test(o.textContent));if(rear)sel.value=rear.value;return;}
     const ext=[...sel.options].find(o=>/usb|hd|netum|booth|document|cam|back|rear/i.test(o.textContent)&&!/front|face|truedepth/i.test(o.textContent));if(ext)sel.value=ext.value;}
-  async function startCamera(deviceId){stopCamera();showErr(false);still.style.display="none";video.style.display="block";
-    const wantRear=isMobile&&!deviceId;
-    // Forsøg højeste opløsning først, fald kun ned hvis enheden afviser
+  let facing="environment";
+  async function startCamera(deviceId,faceOverride){stopCamera();showErr(false);still.style.display="none";video.style.display="block";
+    const face=faceOverride||facing;
+    const useFacing=isMobile&&!deviceId;
     const res=[{width:{ideal:7680},height:{ideal:4320}},{width:{ideal:3840},height:{ideal:2160}},{width:{ideal:1920},height:{ideal:1080}},{}];
     const tries=[];
     res.forEach(r=>{
-      if(deviceId)tries.push({video:Object.assign({deviceId:{exact:deviceId}},r)});
-      else if(wantRear)tries.push({video:Object.assign({facingMode:{ideal:"environment"}},r)});
+      if(useFacing)tries.push({video:Object.assign({facingMode:{exact:face}},r)});
+      else if(deviceId)tries.push({video:Object.assign({deviceId:{exact:deviceId}},r)});
       else tries.push({video:Object.assign({},r)});
     });
+    if(useFacing)tries.push({video:{facingMode:face}});
     tries.push({video:true});
     let ok=false,lastErr=null;
     for(const c of tries){try{stream=await navigator.mediaDevices.getUserMedia(Object.assign({audio:false},c));ok=true;break;}catch(e){lastErr=e;}}
     if(!ok){showErr(true,(lastErr&&(lastErr.message||lastErr.name))||"Adgang nægtet");return;}
     if(deviceId){try{localStorage.setItem("mm_cam",deviceId);}catch(e){}}
     video.srcObject=stream;track=stream.getVideoTracks()[0];
-    // bed om højeste opløsning kameraet kan, hvis tilgængeligt
     try{const caps=track.getCapabilities?track.getCapabilities():null;if(caps&&caps.width&&caps.height){await track.applyConstraints({width:caps.width.max,height:caps.height.max});}}catch(e){}
     await video.play().catch(()=>{});$("liveDot").classList.add("live");$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;requestWake();setupHwZoom();refreshCams();requestAnimationFrame(loop);setHint();showRes();}
   function showRes(){try{const s=track&&track.getSettings?track.getSettings():null;if(s&&s.width)setStatus("Kamera: "+s.width+"×"+s.height+" px");}catch(e){}}
   function setupHwZoom(){const w=$("hwZoomWrap");try{const c=track.getCapabilities?track.getCapabilities():{};if(c&&c.zoom&&c.zoom.max>c.zoom.min){const s=$("hwZoom");s.min=c.zoom.min;s.max=c.zoom.max;s.step=c.zoom.step||((c.zoom.max-c.zoom.min)/50);const cur=track.getSettings().zoom||c.zoom.min;s.value=cur;$("hwZoomVal").textContent=(+cur).toFixed(1)+"×";w.style.display="flex";s.oninput=async()=>{try{await track.applyConstraints({advanced:[{zoom:+s.value}]});$("hwZoomVal").textContent=(+s.value).toFixed(1)+"×";}catch(e){}};return;}}catch(e){}w.style.display="none";}
-  async function refreshCams(){const cur=$("camSelect").value;const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");if(devs.some(d=>d.label)){const sel=$("camSelect");sel.innerHTML="";devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});if(cur)sel.value=cur;}}
+  async function refreshCams(){if(isMobile)return;const cur=$("camSelect").value;const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");if(devs.some(d=>d.label)){const sel=$("camSelect");sel.innerHTML="";devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});if(cur)sel.value=cur;}}
   function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;}$("liveDot").classList.remove("live");}
 
   $("fileInput").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);still.onload=()=>{haveImage=true;still.style.display="block";video.style.display="none";$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;newImage();syncCanvas();draw();setHint();};still.src=url;});
@@ -447,13 +452,24 @@
     if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
     if(!mmPerPx){setStatus("Kalibrér først.");return;}
     if(capTarget){capTarget.pts.push(c2v(x,y));const t=capTarget;capTarget=null;$("capBtn").style.display="none";renderMarks();showResult(t);setHint();draw();return;}
+    // a-mål: når de 4 pladepunkter er sat, trækkes a-stregen ud fra hjørnet
+    if(DEF[fault].mt==="athroat"&&placing.length===4){placing.push(c2v(x,y));athroatDrag=true;drawAthroatPreview();return;}
     placing.push(c2v(x,y));if(placing.length===DEF[fault].n){const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};
       if(DEF[fault].mt==="note"){const t=prompt("Skriv tekst til billedet:","");if(t===null){placing=[];draw();return;}m.text=t;}
       marks.push(m);placing=[];renderMarks();showResult(m);setHint();
       if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}
     }else{setHint();}draw();}
-  function move(e){if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
-  function up(){drag=null;}
+  function move(e){
+    if(athroatDrag){e.preventDefault();const{x,y}=getXY(e);placing[4]=c2v(x,y);drawAthroatPreview();return;}
+    if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
+  function up(){
+    if(athroatDrag){athroatDrag=false;const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};marks.push(m);placing=[];renderMarks();showResult(m);setHint();if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}draw();return;}
+    drag=null;}
+  // live-preview af a-stregen mens man trækker
+  function drawAthroatPreview(){draw();if(placing.length<5)return;const root=lineIntersect(placing[0],placing[1],placing[2],placing[3])||{x:(placing[1].x+placing[3].x)/2,y:(placing[1].y+placing[3].y)/2};
+    const S=placing[4];const a=dist(root,S)*mmPerPx;const rc=v2c(root),sc=v2c(S);
+    ctx.strokeStyle=cvv("--violet");ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(rc.x,rc.y);ctx.lineTo(sc.x,sc.y);ctx.stroke();
+    handle(rc,"#a371f7");handle(sc,cvv("--violet"));label(sc,"a="+fmt(a)+" mm",cvv("--violet"));}
   overlay.addEventListener("mousedown",down);overlay.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
   overlay.addEventListener("touchstart",down,{passive:false});overlay.addEventListener("touchmove",move,{passive:false});window.addEventListener("touchend",up);
   function showResult(m){const ro=$("readout");if(DEF[m.type].mt==="note"){ro.innerHTML='<span class="big">📝 '+(m.text||"(tom)")+'</span>';ro.classList.add("show");return;}const r=evalMark(m);const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+DEF[m.type].name+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
@@ -490,7 +506,7 @@
   function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Tag billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];
-    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","Klik på <b>sømfladen</b> — a trækkes fra hjørnet ud hertil"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
+    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","<b>Træk fra hjørnet</b> ud til sømfladen — slip ved a-toppen"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
     let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
   function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
@@ -629,6 +645,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       setStatus("Sag eksporteret som "+sagName+".zip ("+captures.length+" billeder + rapport).");});});
 
   $("camSelect").addEventListener("change",()=>{try{localStorage.setItem("mm_cam",$("camSelect").value);}catch(e){}if(source==="live")startCamera($("camSelect").value);});
+  document.querySelectorAll("#facingSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#facingSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");facing=b.dataset.face;if(source==="live")startCamera(null,facing);}));
   // ☰ hovedmenu
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
   $("menuBtn").addEventListener("click",()=>toggleMenu());
