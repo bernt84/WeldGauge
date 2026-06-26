@@ -409,7 +409,7 @@
   $("useAAbtn").addEventListener("click",()=>{const last=[...marks].reverse().find(m=>m.type==="aA");if(last){$("aARef").value=(dist(last.pts[0],last.pts[1])*mmPerPx).toFixed(2);renderMarks();draw();setStatus("aA sat fra seneste aA-måling.");}else setStatus("Mål aA først (Vurdering → Makrosnit → aA).");});
   $("undoBtn").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
 
-  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?"Tryk <b>Start</b>":"Vælg et billede";h.style.display="block";return;}
+  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?"Kameraet starter… giv adgang hvis browseren spørger":"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
@@ -546,12 +546,13 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       rememberEmail(sbUser.email);
     }else{sbOrg=null;sbRole="member";}
     updateAuthUI();setSyncPill();}
-  function updateAuthUI(){const ready=!!sb;$("authRow").style.display=(ready&&!sbUser)?"block":"none";$("sessRow").style.display=(ready&&sbUser)?"block":"none";
+  function updateAuthUI(){$("authRow").style.display=(!sbUser)?"block":"none";$("sessRow").style.display=(sbUser)?"block":"none";
     $("adminCard").style.display=(sbUser&&sbRole==="org_admin")?"flex":"none";
     if(sbUser)$("sbWho").innerHTML="Logget ind som <b>"+sbUser.email+"</b>"+(sbOrgName?" · "+sbOrgName:"")+(sbRole==="org_admin"?" (org-admin)":"")+(!sbOrg?' <span style="color:var(--red)">— ingen virksomhed tildelt</span>':"");
-    if(ready&&!sbUser)fillAccts();
+    if(!sbUser)fillAccts();
     if(sbUser&&sbRole==="org_admin")renderOrgUsers();}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
+    if(!sb){if(!sbInitClient()){sbStatus("Kan ikke forbinde — tjek internet og prøv igen.");return;}}
     sbStatus("Logger ind…");const{error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error){sbStatus("Login-fejl: "+error.message);return;}$("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
@@ -600,6 +601,9 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
 
   if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
+  updateAuthUI(); // vis login-felter med det samme, også før forbindelse
+  // hvis login-biblioteket loader sent (langsomt net), så forbind når det er klar
+  if(SB_READY && !sb){let tries=0;const t=setInterval(()=>{tries++;if(typeof supabase!=="undefined"&&supabase.createClient){clearInterval(t);sbInitClient();}else if(tries>40)clearInterval(t);},500);}
   setSyncPill();
 
   /* ============ INIT ============ */
