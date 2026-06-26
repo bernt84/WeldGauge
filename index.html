@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.1</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.2</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -383,9 +383,11 @@
     $("caseCard").style.display=mode==="assess"?"flex":"none";$("ctxSeg").style.display=mode==="assess"?"flex":"none";$("toolLabel").textContent=mode==="assess"?"Fejltype":"Måletype";placing=[];fillFaults();setHint();draw();}));
   document.querySelectorAll("#ctxSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#ctxSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");ctxMode=b.dataset.ctx;placing=[];fillFaults();setHint();draw();}));
   function fillFaults(){const sel=$("faultSelect");sel.innerHTML="";const grp=mode==="measure"?"measure":ctxMode;
-    Object.keys(DEF).filter(k=>DEF[k].grp===grp).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=nameOf(k);sel.appendChild(o);});
-    fault=sel.value;$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";}
-  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];capTarget=null;$("capBtn").style.display="none";$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
+    const keys=Object.keys(DEF).filter(k=>DEF[k].grp===grp);
+    keys.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=nameOf(k);sel.appendChild(o);});
+    fault=sel.value||keys[0]||"m_length";if(!DEF[fault])fault=keys[0]||"m_length";
+    $("concaveWrap").style.display=(DEF[fault]&&DEF[fault].concave)?"flex":"none";}
+  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];capTarget=null;$("capBtn").style.display="none";$("concaveWrap").style.display=(DEF[fault]&&DEF[fault].concave)?"flex":"none";setHint();draw();});
   $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("");$("hint").innerHTML=(I18N[lang]||I18N.da).capClick;$("hint").style.display="block";});
 
   /* ============ KILDE ============ */
