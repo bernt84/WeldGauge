@@ -325,17 +325,21 @@
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
-    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";startCamera($("camSelect").value||null);}newImage();setHint();}
+    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
   function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
 
   /* ============ KAMERA ============ */
   async function listCameras(){try{const t=await navigator.mediaDevices.getUserMedia({video:true});t.getTracks().forEach(x=>x.stop());}catch(e){}
     const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");const sel=$("camSelect");sel.innerHTML="";
     if(!devs.length){sel.innerHTML="<option>Ingen kameraer</option>";return;}devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});
+    const saved=localStorage.getItem("mm_cam");if(saved&&[...sel.options].some(o=>o.value===saved)){sel.value=saved;return;}
+    if(isMobile){const rear=[...sel.options].find(o=>/back|rear|bag|environment/i.test(o.textContent)&&!/front|face|true/i.test(o.textContent));if(rear)sel.value=rear.value;return;}
     const ext=[...sel.options].find(o=>/usb|hd|netum|booth|document|cam|back|rear/i.test(o.textContent)&&!/front|face|truedepth/i.test(o.textContent));if(ext)sel.value=ext.value;}
   async function startCamera(deviceId){stopCamera();showErr(false);still.style.display="none";video.style.display="block";
+    const wantRear=isMobile&&!deviceId;
     try{stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:deviceId?{exact:deviceId}:undefined,facingMode:deviceId?undefined:{ideal:"environment"},width:{ideal:3840},height:{ideal:2160}},audio:false});}
-    catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:deviceId?{deviceId:{exact:deviceId}}:true,audio:false});}catch(e2){showErr(true,e2.message||"Adgang nægtet");return;}}
+    catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:wantRear?{facingMode:{ideal:"environment"}}:(deviceId?{deviceId:{exact:deviceId}}:true),audio:false});}catch(e2){showErr(true,e2.message||"Adgang nægtet");return;}}
+    if(deviceId){try{localStorage.setItem("mm_cam",deviceId);}catch(e){}}
     video.srcObject=stream;track=stream.getVideoTracks()[0];await video.play().catch(()=>{});$("liveDot").classList.add("live");$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;requestWake();setupHwZoom();refreshCams();requestAnimationFrame(loop);setHint();}
   function setupHwZoom(){const w=$("hwZoomWrap");try{const c=track.getCapabilities?track.getCapabilities():{};if(c&&c.zoom&&c.zoom.max>c.zoom.min){const s=$("hwZoom");s.min=c.zoom.min;s.max=c.zoom.max;s.step=c.zoom.step||((c.zoom.max-c.zoom.min)/50);const cur=track.getSettings().zoom||c.zoom.min;s.value=cur;$("hwZoomVal").textContent=(+cur).toFixed(1)+"×";w.style.display="flex";s.oninput=async()=>{try{await track.applyConstraints({advanced:[{zoom:+s.value}]});$("hwZoomVal").textContent=(+s.value).toFixed(1)+"×";}catch(e){}};return;}}catch(e){}w.style.display="none";}
   async function refreshCams(){const cur=$("camSelect").value;const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");if(devs.some(d=>d.label)){const sel=$("camSelect");sel.innerHTML="";devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});if(cur)sel.value=cur;}}
@@ -563,7 +567,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       if(!isMobile&&hasFS&&dirHandle)writeToFolder(sagName+".zip",blob);
       setStatus("Sag eksporteret som "+sagName+".zip ("+captures.length+" billeder + rapport).");});});
 
-  $("camSelect").addEventListener("change",()=>{if(source==="live")startCamera($("camSelect").value);});
+  $("camSelect").addEventListener("change",()=>{try{localStorage.setItem("mm_cam",$("camSelect").value);}catch(e){}if(source==="live")startCamera($("camSelect").value);});
   // ☰ hovedmenu
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
   $("menuBtn").addEventListener("click",()=>toggleMenu());
@@ -584,7 +588,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   function sbInitClient(){
     if(!SB_READY){sbStatus("Projekt-credentials mangler i koden (SB_URL / SB_KEY).");return false;}
     if(typeof supabase==="undefined"||!supabase.createClient){sbStatus("Login kræver internet — du er offline lige nu. Lokal måling virker stadig.");return false;}
-    sb=supabase.createClient(SB_URL,SB_KEY);
+    sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage,storageKey:"wg_session"}});
     sb.auth.onAuthStateChange((_ev,session)=>applySession(session));
     sb.auth.getSession().then(({data})=>applySession(data.session));
     return true;}
