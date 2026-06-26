@@ -210,7 +210,7 @@
     <div class="dlist" id="dlist"></div>
   </div>
 
-  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Tag billede</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>💾 Gem i galleri</button></div>
+  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Tag billede</button><button class="ghost" id="capBtn" style="display:none">➕ Tilføj cap (overhøjde)</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>💾 Gem i galleri</button></div>
 
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
@@ -246,7 +246,7 @@
     m_angle:{name:"Vinkel",kind:"measure",grp:"measure",n:3,mt:"ang",eval:v=>({val:v.deg,disp:v.deg.toFixed(1)+"°",ok:null})},
     m_p2l:{name:"Punkt → linje",kind:"measure",grp:"measure",n:3,mt:"p2l",eval:v=>({val:v.d,disp:"d⊥="+fmt(v.d)+" mm",ok:null})},
     m_note:{name:"📝 Tekst / note",kind:"note",grp:"measure",n:1,mt:"note",eval:v=>({val:0,disp:"",ok:null})},
-    m_athroat:{name:"a-mål (konstruktion, kantsøm)",kind:"measure",grp:"measure",n:5,mt:"athroat",eval:v=>({val:v.a,disp:"a="+fmt(v.a)+" mm"+(v.conv>0.05?" · konv. "+fmt(v.conv)+" mm":""),ok:null})},
+    m_athroat:{name:"a-mål (konstruktion, kantsøm)",kind:"measure",grp:"measure",n:6,mt:"athroat",cap:true,eval:v=>({val:v.a,disp:"a="+fmt(v.a)+" mm"+(v.cap!=null?" · overhøjde "+fmt(v.cap)+" mm":""),ok:null})},
     amaal:{name:"a-mål (5213/5214)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>evalA(v.mm,P)},
     zlegs:{name:"a-mål via z-ben",kind:"assess",grp:"surface",n:4,mt:"zlegs",concave:true,eval:(v,P)=>{if(P.concave)return{val:null,disp:"konkav — mål a direkte",ok:null,allowTxt:"estimat ugyldigt"};const a=0.7071*Math.min(v.z1,v.z2);return evalA(a,P,true);}},
     pore_s:{name:"Overfladepore (2017)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;let allow;if(P.t<=3)allow=pick(P.L,{D:0.3*ref,C:null,B:null});else allow=pick(P.L,{D:Math.min(0.3*ref,3),C:Math.min(0.2*ref,2),B:null});return verd(v.mm,allow,P.L,"d ≤ ");}},
@@ -262,8 +262,8 @@
     root_conc:{name:"Indadhvælving rod (515)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.1*P.t+0.2,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.2*P.t,2),C:Math.min(0.1*P.t,1),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
     root_inc:{name:"Rodfejl 1-sidet stuksøm (4021)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.2*P.t,2),C:null,B:null}),P.L,"h ≤ ")},
     aA:{name:"aA (sæt reference)",kind:"assess",grp:"macro",n:2,mt:"len",eval:v=>({val:v.mm,disp:"aA="+fmt(v.mm)+" mm",ok:null})},
-    a_fillet:{name:"a-mål kantsøm (konstruktion)",kind:"assess",grp:"macro",n:5,mt:"athroat",eval:(v,P)=>{const allow=pick(P.L,{D:null,C:null,B:null});const lo=0.85*(P.nomA||0),hi=(P.nomA||0)+(P.L==="D"?1+0.3*(P.nomA||0):P.L==="C"?1+0.15*(P.nomA||0):1+0.1*(P.nomA||0));let ok=null,txt="a="+fmt(v.a)+" mm";if(P.nomA){ok=v.a>=lo&&v.a<=hi;txt+=" (nom "+fmt(P.nomA)+", "+fmt(lo)+"–"+fmt(hi)+")";}if(v.conv>0.05)txt+=" · konv "+fmt(v.conv)+" mm";return{val:v.a,disp:txt,ok,allowTxt:"a-mål vs. nominel"};}},
-    a_butt:{name:"a-mål stuksøm (gods)",kind:"assess",grp:"macro",n:5,mt:"athroat",eval:(v,P)=>{let txt="a="+fmt(v.a)+" mm";if(v.conv>0.05)txt+=" · konv "+fmt(v.conv)+" mm";let ok=null;if(P.s){ok=v.a>=P.s*0.95;txt+=" (s="+fmt(P.s)+")";}return{val:v.a,disp:txt,ok,allowTxt:"a gennem gods"};}},
+    a_fillet:{name:"a-mål kantsøm (konstruktion)",kind:"assess",grp:"macro",n:6,mt:"athroat",cap:true,eval:(v,P)=>{const lo=0.85*(P.nomA||0),hi=(P.nomA||0)+(P.L==="D"?1+0.3*(P.nomA||0):P.L==="C"?1+0.15*(P.nomA||0):1+0.1*(P.nomA||0));let ok=null,txt="a="+fmt(v.a)+" mm";if(P.nomA){ok=v.a>=lo&&v.a<=hi;txt+=" (nom "+fmt(P.nomA)+", "+fmt(lo)+"–"+fmt(hi)+")";}if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";return{val:v.a,disp:txt,ok,allowTxt:"a-mål vs. nominel"};}},
+    a_butt:{name:"a-mål stuksøm (gods)",kind:"assess",grp:"macro",n:6,mt:"athroat",cap:true,eval:(v,P)=>{let txt="a="+fmt(v.a)+" mm";if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";let ok=null;if(P.s){ok=v.a>=P.s*0.95;txt+=" (s="+fmt(P.s)+")";}return{val:v.a,disp:txt,ok,allowTxt:"a gennem gods"};}},
     pore_i:{name:"Indre pore (2.3b)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,5),C:Math.min(0.3*ref,4),B:Math.min(0.2*ref,3)}),P.L,"d ≤ ");}},
     incl:{name:"Indeslutning (2.9)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:Math.min(0.3*ref,3),B:Math.min(0.2*ref,2)}),P.L,"h ≤ ");}},
     lof:{name:"Bindingsfejl (2.12)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:null,B:null}),P.L,"h ≤ ");}},
@@ -281,7 +281,7 @@
 
   let source="live",stream=null,track=null,haveImage=false,frozen=false;
   let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
-  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false;
+  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,capTarget=null,lastAthroat=null;
   let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1;
   let captures=[],editIndex=-1,prevState=null,markerCorners=null;
 
@@ -316,20 +316,13 @@
     if(mt==="ang"){const[a,b,c]=pts;const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};const dd=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));return{deg:Math.acos(Math.max(-1,Math.min(1,dd)))*180/Math.PI};}
     if(mt==="p2l")return{d:perp(pts[2],pts[0],pts[1])*scale};
     if(mt==="athroat"){
-      // pts: 0-1 plade A, 2-3 plade B, 4 sømoverflade
-      const A1=pts[0],A2=pts[1],B1=pts[2],B2=pts[3],S=pts[4];
+      // pts: 0-1 plade A, 2-3 plade B, 4-5 hypotenuse (sømflade), 6 (valgfri) cap-top
+      const A1=pts[0],A2=pts[1],B1=pts[2],B2=pts[3];
       const root=lineIntersect(A1,A2,B1,B2)||{x:(A2.x+B2.x)/2,y:(A2.y+B2.y)/2};
-      // vinkelhalveringslinje fra rod
-      const dA=norm({x:A2.x-A1.x,y:A2.y-A1.y}),dB=norm({x:B2.x-B1.x,y:B2.y-B1.y});
-      // sørg for at begge peger væk fra roden mod pladeenderne
-      const uA=(dot2(sub(A2,root),dA)>=0)?dA:neg(dA),uB=(dot2(sub(B2,root),dB)>=0)?dB:neg(dB);
-      let bis=norm({x:uA.x+uB.x,y:uA.y+uB.y});if(!isFinite(bis.x)||(bis.x===0&&bis.y===0))bis=norm(sub(S,root));
-      // a = projektion af (S-rod) på halveringslinjen
-      const a=Math.abs(dot2(sub(S,root),bis))*scale;
-      // teoretisk a = afstand fra rod til korden mellem pladeender (toes), langs halvering
-      let conv=0;{const toeChord=perpPointToSeg(root,A2,B2);/*ikke brugt direkte*/
-        const aTheo=Math.abs(dot2(sub(midOnLine(A2,B2),root),bis))*scale;conv=Math.max(0,a-aTheo);}
-      return{a,conv,root,bis,_pts:pts};
+      let a=0,cap=null,foot=null,H1=null,H2=null;
+      if(pts.length>=6){H1=pts[4];H2=pts[5];a=perp(root,H1,H2)*scale;foot=footOf(root,H1,H2);
+        if(pts.length>=7&&pts[6]){cap=perp(pts[6],H1,H2)*scale;}}
+      return{a,cap,root,H1,H2,foot,_pts:pts};
     }
     if(mt==="zlegs"||mt==="diff")return{z1:dist(pts[0],pts[1])*scale,z2:dist(pts[2],pts[3])*scale};
     return{mm:dist(pts[0],pts[1])*scale};}
@@ -341,7 +334,8 @@
   function fillFaults(){const sel=$("faultSelect");sel.innerHTML="";const grp=mode==="measure"?"measure":ctxMode;
     Object.keys(DEF).filter(k=>DEF[k].grp===grp).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=DEF[k].name;sel.appendChild(o);});
     fault=sel.value;$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";}
-  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
+  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];capTarget=null;$("capBtn").style.display="none";$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
+  $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("Klik på toppen af cappen (svejsningens overflade).");$("hint").innerHTML="📐 Klik på <b>toppen af cappen</b>";$("hint").style.display="block";});
 
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
@@ -407,6 +401,7 @@
   function midOnLine(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
   function perpPointToSeg(p,a,b){return foot(p,a,b);}
   function lineIntersect(p1,p2,p3,p4){const d1x=p2.x-p1.x,d1y=p2.y-p1.y,d2x=p4.x-p3.x,d2y=p4.y-p3.y;const den=d1x*d2y-d1y*d2x;if(Math.abs(den)<1e-6)return null;const t=((p3.x-p1.x)*d2y-(p3.y-p1.y)*d2x)/den;return{x:p1.x+t*d1x,y:p1.y+t*d1y};}
+  function footOf(p,a,b){const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1;const t=((p.x-a.x)*dx+(p.y-a.y)*dy)/L2;return{x:a.x+t*dx,y:a.y+t*dy};}
   function valsFor(type,pts){return valsForPts(type,DEF[type].n,pts,mmPerPx);}
   function evalMark(m){return DEF[m.type].eval(valsFor(m.type,m.pts),params());}
 
@@ -416,7 +411,7 @@
     if(markerCorners){ctx.strokeStyle=cvv("--green");ctx.lineWidth=2*dpr;ctx.setLineDash([6*dpr,4*dpr]);ctx.beginPath();markerCorners.forEach((p,i)=>{const c=v2c(p);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y);});ctx.closePath();ctx.stroke();ctx.setLineDash([]);markerCorners.forEach(p=>{const c=v2c(p);ctx.beginPath();ctx.arc(c.x,c.y,5*dpr,0,7);ctx.fillStyle=cvv("--green");ctx.fill();});}
     marks.forEach((m,i)=>drawMark(m,i+1));
     if(placing.length){const col=cvv("--violet");const d=DEF[fault];
-      if(d.mt==="athroat"){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
+      if(d.mt==="athroat"){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);if(placing.length>=6)rawline(placing[4],placing[5],"#ffd166");}
       else if(d.mt==="p2l"){if(placing.length>=2)rawline(placing[0],placing[1],col);}
       else if(d.n===3){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length===3)rawline(placing[1],placing[2],col);}
       else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
@@ -426,13 +421,11 @@
     if(def.mt==="note"){const col="#ffd166";const c=v2c(p[0]);label(c,(num+". "+(m.text||"(tom)")),col);handle(c,col);return;}
     const r=evalMark(m);const col=colorFor(def,r.ok);
     if(def.mt==="athroat"){if(p.length>=2)rawline(p[0],p[1],"#39c5cf");if(p.length>=4)rawline(p[2],p[3],"#39c5cf");
-      if(p.length===5&&r.root&&r.bis){const root=v2c(r.root);const S=v2c(p[4]);
-        // halveringslinje rod -> projiceret punkt på sømoverflade
-        const projLen=dot2(sub(p[4],r.root),r.bis);const tip={x:r.root.x+r.bis.x*projLen,y:r.root.y+r.bis.y*projLen};const tipC=v2c(tip);
-        ctx.strokeStyle=col;ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(root.x,root.y);ctx.lineTo(tipC.x,tipC.y);ctx.stroke();
-        // markér rod og sømpunkt
-        handle(root,"#a371f7");handle(S,col);label(tipC,tag(num,r),col);}
-      p.forEach(pt=>handle(v2c(pt),"#39c5cf"));if(p.length===5){handle(v2c(p[4]),col);}return;}
+      if(p.length>=6&&r.root&&r.H1){rawline(r.H1,r.H2,"#ffd166");const root=v2c(r.root),foot=v2c(r.foot);
+        ctx.strokeStyle=col;ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(root.x,root.y);ctx.lineTo(foot.x,foot.y);ctx.stroke();
+        handle(root,"#a371f7");label(foot,tag(num,r),col);
+        if(p.length>=7&&p[6]){const cp=v2c(p[6]),cf=v2c(footOf(p[6],r.H1,r.H2));ctx.strokeStyle="#ff7b72";ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(cp.x,cp.y);ctx.lineTo(cf.x,cf.y);ctx.stroke();ctx.setLineDash([]);handle(cp,"#ff7b72");}}
+      p.forEach(pt=>handle(v2c(pt),"#39c5cf"));return;}
     if(def.mt==="p2l"){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);const a=v2c(p[2]),b=v2c(f);ctx.strokeStyle=col;ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);label(v2c(p[2]),tag(num,r),col);}}
     else if(def.n===3){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){rawline(p[1],p[2],col);label(v2c(p[1]),tag(num,r),col);}}
     else if(def.n===4){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=4){rawline(p[2],p[3],col);label(v2c(p[0]),tag(num,r),col);}}
@@ -453,9 +446,12 @@
   function down(e){if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
     if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
     if(!mmPerPx){setStatus("Kalibrér først.");return;}
+    if(capTarget){capTarget.pts.push(c2v(x,y));const t=capTarget;capTarget=null;$("capBtn").style.display="none";renderMarks();showResult(t);setHint();draw();return;}
     placing.push(c2v(x,y));if(placing.length===DEF[fault].n){const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};
       if(DEF[fault].mt==="note"){const t=prompt("Skriv tekst til billedet:","");if(t===null){placing=[];draw();return;}m.text=t;}
-      marks.push(m);placing=[];renderMarks();showResult(m);setHint();}else{setHint();}draw();}
+      marks.push(m);placing=[];renderMarks();showResult(m);setHint();
+      if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}
+    }else{setHint();}draw();}
   function move(e){if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
   function up(){drag=null;}
   overlay.addEventListener("mousedown",down);overlay.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
@@ -494,7 +490,7 @@
   function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Tag billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];
-    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b> (1/2)","Klik <b>2. punkt</b> på <b>plade 1</b> (2/2)","Klik <b>2 punkter</b> langs <b>plade 2</b> (1/2)","Klik <b>2. punkt</b> på <b>plade 2</b> (2/2)","Klik på <b>sømoverfladen</b> (a-mål)"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet");h.style.display="block";return;}
+    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","Tegn <b>hypotenusen</b> (sømfladen): 1. punkt","<b>Hypotenuse</b>: 2. punkt — så beregnes a"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
     let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
   function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
@@ -507,8 +503,9 @@
       if(def.mt==="note"){const col="#ffd166";const a=p[0];const t=(i+1)+". "+(m.text||"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);g.beginPath();g.arc(a.x,a.y,lw*2,0,7);g.fill();return;}
       const r=cap.results[i];const col=def.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";
       if(def.mt==="athroat"){if(p.length>=2)ln(p[0],p[1],"#39c5cf");if(p.length>=4)ln(p[2],p[3],"#39c5cf");
-        if(p.length===5&&r.root&&r.bis){const projLen=dot2(sub(p[4],r.root),r.bis);const tip={x:r.root.x+r.bis.x*projLen,y:r.root.y+r.bis.y*projLen};g.strokeStyle=col;g.lineWidth=lw;g.beginPath();g.moveTo(r.root.x,r.root.y);g.lineTo(tip.x,tip.y);g.stroke();g.fillStyle="#a371f7";g.beginPath();g.arc(r.root.x,r.root.y,lw*1.6,0,7);g.fill();
-          const a=tip;const t=(i+1)+". "+r.disp;const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);}return;}
+        if(p.length>=6&&r.root&&r.H1){ln(r.H1,r.H2,"#ffd166");g.strokeStyle=col;g.lineWidth=lw;g.beginPath();g.moveTo(r.root.x,r.root.y);g.lineTo(r.foot.x,r.foot.y);g.stroke();g.fillStyle="#a371f7";g.beginPath();g.arc(r.root.x,r.root.y,lw*1.6,0,7);g.fill();
+          if(p.length>=7&&p[6]){const cf=footOf(p[6],r.H1,r.H2);g.strokeStyle="#ff7b72";g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[6].x,p[6].y);g.lineTo(cf.x,cf.y);g.stroke();g.setLineDash([]);}
+          const a=r.foot;const t=(i+1)+". "+r.disp;const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);}return;}
       if(def.mt==="p2l"){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[2].x,p[2].y);g.lineTo(f.x,f.y);g.stroke();g.setLineDash([]);}}
       else if(def.n===3){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3)ln(p[1],p[2],col);}
       else if(def.n===4){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=4)ln(p[2],p[3],col);}
