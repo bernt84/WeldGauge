@@ -150,7 +150,7 @@
         <div class="dlist" id="sagList"></div>
       </div>
       <div class="store-pill" id="sbStatus">Ikke logget ind — lokal måling fungerer uden login.</div>
-      <div class="note">Log ind med din WeldGauge-konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Login kræver internet.</div>
+      
     </div>
 
     <div class="card" id="adminCard" style="display:none">
@@ -607,14 +607,14 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
     if(!sbUser)fillAccts();
     if(canAdmin){renderOrgUsers();if(sbSuper)renderOrgs();}}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
-    if(!sb){if(!sbInitClient()){sbStatus("Kan ikke forbinde — tjek internet og prøv igen.");return;}}
+    if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet, og prøv igen om et øjeblik.");return;}}
     sbStatus("Logger ind…");
     try{
-      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tidsudløb — tjek internet")),15000));
-      const{error}=await Promise.race([sb.auth.signInWithPassword({email:em,password:pw}),timeout]);
-      if(error){sbStatus("Login-fejl: "+error.message);return;}
+      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tidsudløb — ingen svar fra server (tjek internet/nøgle)")),15000));
+      const{data,error}=await Promise.race([sb.auth.signInWithPassword({email:em,password:pw}),timeout]);
+      if(error){console.error("WeldGauge login-fejl:",error);sbStatus("Login-fejl: "+(error.message||error.status||error));return;}
       $("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
-    }catch(e){sbStatus("Login-fejl: "+(e.message||e));}}
+    }catch(e){console.error("WeldGauge login-exception:",e);sbStatus("Login-fejl: "+(e.message||e));}}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
