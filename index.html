@@ -246,7 +246,7 @@
     m_angle:{name:"Vinkel",kind:"measure",grp:"measure",n:3,mt:"ang",eval:v=>({val:v.deg,disp:v.deg.toFixed(1)+"°",ok:null})},
     m_p2l:{name:"Punkt → linje",kind:"measure",grp:"measure",n:3,mt:"p2l",eval:v=>({val:v.d,disp:"d⊥="+fmt(v.d)+" mm",ok:null})},
     m_note:{name:"📝 Tekst / note",kind:"note",grp:"measure",n:1,mt:"note",eval:v=>({val:0,disp:"",ok:null})},
-    m_athroat:{name:"a-mål (konstruktion, kantsøm)",kind:"measure",grp:"measure",n:6,mt:"athroat",cap:true,eval:v=>({val:v.a,disp:"a="+fmt(v.a)+" mm"+(v.cap!=null?" · overhøjde "+fmt(v.cap)+" mm":""),ok:null})},
+    m_athroat:{name:"a-mål (konstruktion, kantsøm)",kind:"measure",grp:"measure",n:5,mt:"athroat",cap:true,eval:v=>({val:v.a,disp:"a="+fmt(v.a)+" mm"+(v.cap!=null?" · overhøjde "+fmt(v.cap)+" mm":""),ok:null})},
     amaal:{name:"a-mål (5213/5214)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>evalA(v.mm,P)},
     zlegs:{name:"a-mål via z-ben",kind:"assess",grp:"surface",n:4,mt:"zlegs",concave:true,eval:(v,P)=>{if(P.concave)return{val:null,disp:"konkav — mål a direkte",ok:null,allowTxt:"estimat ugyldigt"};const a=0.7071*Math.min(v.z1,v.z2);return evalA(a,P,true);}},
     pore_s:{name:"Overfladepore (2017)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;let allow;if(P.t<=3)allow=pick(P.L,{D:0.3*ref,C:null,B:null});else allow=pick(P.L,{D:Math.min(0.3*ref,3),C:Math.min(0.2*ref,2),B:null});return verd(v.mm,allow,P.L,"d ≤ ");}},
@@ -262,8 +262,8 @@
     root_conc:{name:"Indadhvælving rod (515)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{let allow;if(P.t<=3)allow=pick(P.L,{D:0.1*P.t+0.2,C:0.1*P.t,B:null});else allow=pick(P.L,{D:Math.min(0.2*P.t,2),C:Math.min(0.1*P.t,1),B:Math.min(0.05*P.t,0.5)});return verd(v.mm,allow,P.L,"h ≤ ");}},
     root_inc:{name:"Rodfejl 1-sidet stuksøm (4021)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>verd(v.mm,pick(P.L,{D:Math.min(0.2*P.t,2),C:null,B:null}),P.L,"h ≤ ")},
     aA:{name:"aA (sæt reference)",kind:"assess",grp:"macro",n:2,mt:"len",eval:v=>({val:v.mm,disp:"aA="+fmt(v.mm)+" mm",ok:null})},
-    a_fillet:{name:"a-mål kantsøm (konstruktion)",kind:"assess",grp:"macro",n:6,mt:"athroat",cap:true,eval:(v,P)=>{const lo=0.85*(P.nomA||0),hi=(P.nomA||0)+(P.L==="D"?1+0.3*(P.nomA||0):P.L==="C"?1+0.15*(P.nomA||0):1+0.1*(P.nomA||0));let ok=null,txt="a="+fmt(v.a)+" mm";if(P.nomA){ok=v.a>=lo&&v.a<=hi;txt+=" (nom "+fmt(P.nomA)+", "+fmt(lo)+"–"+fmt(hi)+")";}if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";return{val:v.a,disp:txt,ok,allowTxt:"a-mål vs. nominel"};}},
-    a_butt:{name:"a-mål stuksøm (gods)",kind:"assess",grp:"macro",n:6,mt:"athroat",cap:true,eval:(v,P)=>{let txt="a="+fmt(v.a)+" mm";if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";let ok=null;if(P.s){ok=v.a>=P.s*0.95;txt+=" (s="+fmt(P.s)+")";}return{val:v.a,disp:txt,ok,allowTxt:"a gennem gods"};}},
+    a_fillet:{name:"a-mål kantsøm (konstruktion)",kind:"assess",grp:"macro",n:5,mt:"athroat",cap:true,eval:(v,P)=>{const lo=0.85*(P.nomA||0),hi=(P.nomA||0)+(P.L==="D"?1+0.3*(P.nomA||0):P.L==="C"?1+0.15*(P.nomA||0):1+0.1*(P.nomA||0));let ok=null,txt="a="+fmt(v.a)+" mm";if(P.nomA){ok=v.a>=lo&&v.a<=hi;txt+=" (nom "+fmt(P.nomA)+", "+fmt(lo)+"–"+fmt(hi)+")";}if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";return{val:v.a,disp:txt,ok,allowTxt:"a-mål vs. nominel"};}},
+    a_butt:{name:"a-mål stuksøm (gods)",kind:"assess",grp:"macro",n:5,mt:"athroat",cap:true,eval:(v,P)=>{let txt="a="+fmt(v.a)+" mm";if(v.cap!=null)txt+=" · overhøjde "+fmt(v.cap)+" mm";let ok=null;if(P.s){ok=v.a>=P.s*0.95;txt+=" (s="+fmt(P.s)+")";}return{val:v.a,disp:txt,ok,allowTxt:"a gennem gods"};}},
     pore_i:{name:"Indre pore (2.3b)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,5),C:Math.min(0.3*ref,4),B:Math.min(0.2*ref,3)}),P.L,"d ≤ ");}},
     incl:{name:"Indeslutning (2.9)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:Math.min(0.3*ref,3),B:Math.min(0.2*ref,2)}),P.L,"h ≤ ");}},
     lof:{name:"Bindingsfejl (2.12)",kind:"assess",grp:"macro",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;return verd(v.mm,pick(P.L,{D:Math.min(0.4*ref,4),C:null,B:null}),P.L,"h ≤ ");}},
@@ -316,13 +316,13 @@
     if(mt==="ang"){const[a,b,c]=pts;const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};const dd=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));return{deg:Math.acos(Math.max(-1,Math.min(1,dd)))*180/Math.PI};}
     if(mt==="p2l")return{d:perp(pts[2],pts[0],pts[1])*scale};
     if(mt==="athroat"){
-      // pts: 0-1 plade A, 2-3 plade B, 4-5 hypotenuse (sømflade), 6 (valgfri) cap-top
+      // pts: 0-1 plade A, 2-3 plade B, 4 a-top (sømflade), 5 (valgfri) cap-top
       const A1=pts[0],A2=pts[1],B1=pts[2],B2=pts[3];
       const root=lineIntersect(A1,A2,B1,B2)||{x:(A2.x+B2.x)/2,y:(A2.y+B2.y)/2};
-      let a=0,cap=null,foot=null,H1=null,H2=null;
-      if(pts.length>=6){H1=pts[4];H2=pts[5];a=perp(root,H1,H2)*scale;foot=footOf(root,H1,H2);
-        if(pts.length>=7&&pts[6]){cap=perp(pts[6],H1,H2)*scale;}}
-      return{a,cap,root,H1,H2,foot,_pts:pts};
+      let a=0,cap=null,dir=null;
+      if(pts.length>=5){const S=pts[4];a=dist(root,S)*scale;dir=norm(sub(S,root));
+        if(pts.length>=6&&pts[5]){const proj=dot2(sub(pts[5],root),dir)*scale;cap=Math.max(0,proj-a);}}
+      return{a,cap,root,S:pts[4],dir,_pts:pts};
     }
     if(mt==="zlegs"||mt==="diff")return{z1:dist(pts[0],pts[1])*scale,z2:dist(pts[2],pts[3])*scale};
     return{mm:dist(pts[0],pts[1])*scale};}
@@ -411,7 +411,7 @@
     if(markerCorners){ctx.strokeStyle=cvv("--green");ctx.lineWidth=2*dpr;ctx.setLineDash([6*dpr,4*dpr]);ctx.beginPath();markerCorners.forEach((p,i)=>{const c=v2c(p);i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y);});ctx.closePath();ctx.stroke();ctx.setLineDash([]);markerCorners.forEach(p=>{const c=v2c(p);ctx.beginPath();ctx.arc(c.x,c.y,5*dpr,0,7);ctx.fillStyle=cvv("--green");ctx.fill();});}
     marks.forEach((m,i)=>drawMark(m,i+1));
     if(placing.length){const col=cvv("--violet");const d=DEF[fault];
-      if(d.mt==="athroat"){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);if(placing.length>=6)rawline(placing[4],placing[5],"#ffd166");}
+      if(d.mt==="athroat"){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
       else if(d.mt==="p2l"){if(placing.length>=2)rawline(placing[0],placing[1],col);}
       else if(d.n===3){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length===3)rawline(placing[1],placing[2],col);}
       else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
@@ -421,10 +421,10 @@
     if(def.mt==="note"){const col="#ffd166";const c=v2c(p[0]);label(c,(num+". "+(m.text||"(tom)")),col);handle(c,col);return;}
     const r=evalMark(m);const col=colorFor(def,r.ok);
     if(def.mt==="athroat"){if(p.length>=2)rawline(p[0],p[1],"#39c5cf");if(p.length>=4)rawline(p[2],p[3],"#39c5cf");
-      if(p.length>=6&&r.root&&r.H1){rawline(r.H1,r.H2,"#ffd166");const root=v2c(r.root),foot=v2c(r.foot);
-        ctx.strokeStyle=col;ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(root.x,root.y);ctx.lineTo(foot.x,foot.y);ctx.stroke();
-        handle(root,"#a371f7");label(foot,tag(num,r),col);
-        if(p.length>=7&&p[6]){const cp=v2c(p[6]),cf=v2c(footOf(p[6],r.H1,r.H2));ctx.strokeStyle="#ff7b72";ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(cp.x,cp.y);ctx.lineTo(cf.x,cf.y);ctx.stroke();ctx.setLineDash([]);handle(cp,"#ff7b72");}}
+      if(p.length>=5&&r.root&&r.S){const root=v2c(r.root),S=v2c(r.S);
+        ctx.strokeStyle=col;ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(root.x,root.y);ctx.lineTo(S.x,S.y);ctx.stroke();
+        handle(root,"#a371f7");label(S,tag(num,r),col);
+        if(p.length>=6&&p[5]&&r.dir){const cp=v2c(p[5]);ctx.strokeStyle="#ff7b72";ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(S.x,S.y);ctx.lineTo(cp.x,cp.y);ctx.stroke();ctx.setLineDash([]);handle(cp,"#ff7b72");}}
       p.forEach(pt=>handle(v2c(pt),"#39c5cf"));return;}
     if(def.mt==="p2l"){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);const a=v2c(p[2]),b=v2c(f);ctx.strokeStyle=col;ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);label(v2c(p[2]),tag(num,r),col);}}
     else if(def.n===3){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){rawline(p[1],p[2],col);label(v2c(p[1]),tag(num,r),col);}}
@@ -490,7 +490,7 @@
   function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Tag billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];
-    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","Tegn <b>hypotenusen</b> (sømfladen): 1. punkt","<b>Hypotenuse</b>: 2. punkt — så beregnes a"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
+    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","Klik på <b>sømfladen</b> — a trækkes fra hjørnet ud hertil"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
     let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
   function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
@@ -503,9 +503,9 @@
       if(def.mt==="note"){const col="#ffd166";const a=p[0];const t=(i+1)+". "+(m.text||"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);g.beginPath();g.arc(a.x,a.y,lw*2,0,7);g.fill();return;}
       const r=cap.results[i];const col=def.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";
       if(def.mt==="athroat"){if(p.length>=2)ln(p[0],p[1],"#39c5cf");if(p.length>=4)ln(p[2],p[3],"#39c5cf");
-        if(p.length>=6&&r.root&&r.H1){ln(r.H1,r.H2,"#ffd166");g.strokeStyle=col;g.lineWidth=lw;g.beginPath();g.moveTo(r.root.x,r.root.y);g.lineTo(r.foot.x,r.foot.y);g.stroke();g.fillStyle="#a371f7";g.beginPath();g.arc(r.root.x,r.root.y,lw*1.6,0,7);g.fill();
-          if(p.length>=7&&p[6]){const cf=footOf(p[6],r.H1,r.H2);g.strokeStyle="#ff7b72";g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[6].x,p[6].y);g.lineTo(cf.x,cf.y);g.stroke();g.setLineDash([]);}
-          const a=r.foot;const t=(i+1)+". "+r.disp;const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);}return;}
+        if(p.length>=5&&r.root&&r.S){g.strokeStyle=col;g.lineWidth=lw;g.beginPath();g.moveTo(r.root.x,r.root.y);g.lineTo(r.S.x,r.S.y);g.stroke();g.fillStyle="#a371f7";g.beginPath();g.arc(r.root.x,r.root.y,lw*1.6,0,7);g.fill();
+          if(p.length>=6&&p[5]){g.strokeStyle="#ff7b72";g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(r.S.x,r.S.y);g.lineTo(p[5].x,p[5].y);g.stroke();g.setLineDash([]);}
+          const a=r.S;const t=(i+1)+". "+r.disp;const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);}return;}
       if(def.mt==="p2l"){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[2].x,p[2].y);g.lineTo(f.x,f.y);g.stroke();g.setLineDash([]);}}
       else if(def.n===3){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3)ln(p[1],p[2],col);}
       else if(def.n===4){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=4)ln(p[2],p[3],col);}
