@@ -113,32 +113,34 @@
 <div class="controls" id="controls">
   <!-- ===== HOVEDMENU (☰) — kilde, gem/eksport, indstillinger ===== -->
   <div class="menupanel" id="menuPanel">
-    <h2>Kilde</h2>
-    <div class="seg" id="sourceSeg"><button data-src="live" class="active">📷 Live kamera</button><button data-src="upload">🖼 Upload billede</button></div>
+    <div class="row" style="justify-content:flex-end"><select id="langSel" style="flex:0 0 auto;padding:6px 8px"><option value="da">🇩🇰 Dansk</option><option value="en">🇬🇧 English</option><option value="lt">🇱🇹 Lietuvių</option></select></div>
+    <h2 data-i18n="src">Kilde</h2>
+    <div class="seg" id="sourceSeg"><button data-src="live" class="active" data-i18n="srcLive">📷 Live kamera</button><button data-src="upload" data-i18n="srcUpload">🖼 Upload billede</button></div>
     <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select></div>
-    <div class="seg" id="facingSeg" style="display:none"><button data-face="environment" class="active">📷 Bagkamera</button><button data-face="user">🤳 Forkamera</button></div>
+    <div class="seg" id="facingSeg" style="display:none"><button data-face="environment" class="active" data-i18n="rear">📷 Bagkamera</button><button data-face="user" data-i18n="front">🤳 Forkamera</button></div>
     <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
 
-    <h2>Gem &amp; eksport</h2>
+    <h2 data-i18n="saveExp">Gem &amp; eksport</h2>
     <div class="mini" id="exportEmpty" style="margin-bottom:6px">Tag et billede først — så kan du hente billeder, lave rapport og eksportere sagen.</div>
-    <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent alle billeder</button></div>
+    <div class="btn-grid"><button class="ghost" id="downloadAllBtn" data-i18n="dlAll">⬇ Hent alle billeder</button></div>
     <div class="card" id="reportCard" style="display:none">
-      <h3>Rapport</h3>
+      <h3 data-i18n="report">Rapport</h3>
       <div class="row"><label>Operatør</label><input type="text" id="rpOperator" placeholder="Navn"></div>
       <div class="row"><label>Emne/WPS</label><input type="text" id="rpJob" placeholder="Emne, ordre eller WPS-nr."></div>
-      <button class="primary" id="reportBtn">📄 Generér rapport</button>
-      <button class="ghost" id="exportZipBtn">📦 Eksportér sag (ZIP: billeder + rapport)</button>
+      <div class="mini" data-i18n="reportLang" style="margin-bottom:4px">Rapportsprog:</div>
+      <div class="btn-grid"><button class="primary" data-rep="da">🇩🇰 DA</button><button class="primary" data-rep="en">🇬🇧 EN</button><button class="primary" data-rep="lt">🇱🇹 LT</button></div>
+      <button class="ghost" id="exportZipBtn" data-i18n="exportZip">📦 Eksportér sag (ZIP: billeder + rapport)</button>
       <div class="note">Udskriftsklar rapport med separate afsnit for målinger og vurderinger. Browser → Udskriv → Gem som PDF. På PC med valgt mappe gemmes rapporten også der.</div>
     </div>
 
-    <h2>Lagring</h2>
+    <h2 data-i18n="storage">Lagring</h2>
     <div class="card" id="storeCard">
       <div class="store-pill" id="storeInfo">—</div>
-      <button class="ghost" id="folderBtn" style="display:none">📁 Vælg mappe på PC</button>
-      <button class="ghost" id="clearGalBtn">🗑 Ryd galleri</button>
+      <button class="ghost" id="folderBtn" style="display:none" data-i18n="pickFolder">📁 Vælg mappe på PC</button>
+      <button class="ghost" id="clearGalBtn" data-i18n="clearGal">🗑 Ryd galleri</button>
     </div>
 
-    <h2>Log ind</h2>
+    <h2 data-i18n="login">Log ind</h2>
     <div class="card" id="syncCard">
       <div id="authRow" style="display:none">
         <div class="row"><label>Konto</label><select id="sbAcct" style="flex:1"></select></div>
@@ -172,26 +174,26 @@
       <div class="dlist" id="auList"></div>
     </div>
 
-    <h2>App</h2>
+    <h2 data-i18n="app">App</h2>
     <div class="card" id="appCard">
       <button class="primary" id="installBtn" style="display:none">⬇ Installér app</button>
       <div class="mini" id="installHint"></div>
-      <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
+      <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
-  <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active">📏 Måling</button><button data-mode="assess">✓ Vurdering</button></div>
+  <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active" data-i18n="measure">📏 Måling</button><button data-mode="assess" data-i18n="assess">✓ Vurdering</button></div>
 
   <div class="zoomwrap" id="hwZoomWrap" style="display:none"><label>Kamera-zoom</label><input type="range" id="hwZoom"><span id="hwZoomVal">–</span></div>
   <div class="zoomwrap" id="zoomWrap" style="display:none"><label>Zoom</label><input type="range" id="zoom" min="1" max="5" step="0.1" value="1"><span id="zoomVal">1.0×</span></div>
 
-  <div class="seg" id="calSeg"><button data-cal="manual" class="active">Lineal (2 punkter)</button><button data-cal="marker">Kalibreringsmærke</button></div>
+  <div class="seg" id="calSeg"><button data-cal="manual" class="active" data-i18n="calRuler">Lineal (2 punkter)</button><button data-cal="marker" data-i18n="calMarker">Kalibreringsmærke</button></div>
   <div class="row" id="calManualRow"><label>Kendt længde</label><input type="number" id="refLen" value="10" min="0.1" step="0.1"><select id="refUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="calBtn">Kalibrér</button></div>
   <div class="row" id="calMarkerRow" style="display:none"><label>Mærkets side</label><input type="number" id="markerSize" value="20" min="1" step="0.5"><select id="markerUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="detectBtn">Detektér</button></div>
 
   <div class="card" id="caseCard" style="display:none">
-    <h3>Sag — gælder alle vurderinger</h3>
+    <h3 data-i18n="caseHead">Sag — gælder alle vurderinger</h3>
     <div class="row"><label>Niveau</label><select id="level" style="flex:0 0 56px;min-width:0"><option>B</option><option selected>C</option><option>D</option></select>
       <label>Søm</label><select id="weldType" style="flex:0 0 96px;min-width:0"><option value="fillet">Kantsøm</option><option value="butt">Stuksøm</option></select>
       <label>t</label><input type="number" id="tThk" value="8" min="0.5" step="0.5"></div>
@@ -211,7 +213,7 @@
     <div class="dlist" id="dlist"></div>
   </div>
 
-  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Tag billede</button><button class="ghost" id="capBtn" style="display:none">➕ Tilføj cap (overhøjde)</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>💾 Gem i galleri</button></div>
+  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none" data-i18n="takePhoto">📷 Tag billede</button><button class="ghost" id="capBtn" style="display:none" data-i18n="addCap">➕ Tilføj cap (overhøjde)</button><button class="ghost" id="undoBtn" data-i18n="undo">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled data-i18n="saveGal">💾 Gem i galleri</button></div>
 
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
@@ -235,6 +237,51 @@
   const isMobile=isTouch&&Math.min(screen.width,screen.height)<820;
   const hasFS = !isMobile && ('showDirectoryPicker' in window);
   const LIFETIME_MS=30*24*3600*1000; // 30 dage auto-sletning fra gemt
+
+  /* ============ SPROG (DA/EN/LT) ============ */
+  const I18N={
+    da:{src:"Kilde",srcLive:"📷 Live kamera",srcUpload:"🖼 Upload billede",rear:"📷 Bagkamera",front:"🤳 Forkamera",saveExp:"Gem & eksport",dlAll:"⬇ Hent alle billeder",report:"Rapport",genReport:"📄 Generér rapport",exportZip:"📦 Eksportér sag (ZIP: billeder + rapport)",storage:"Lagring",pickFolder:"📁 Vælg mappe på PC",clearGal:"🗑 Ryd galleri",login:"Log ind",app:"App",keepAwake:"Hold skærmen tændt under brug",measure:"📏 Måling",assess:"✓ Vurdering",calRuler:"Lineal (2 punkter)",calMarker:"Kalibreringsmærke",caseHead:"Sag — gælder alle vurderinger",undo:"↶ Fortryd sidste",takePhoto:"📷 Tag billede",addCap:"➕ Tilføj cap (overhøjde)",saveGal:"💾 Gem i galleri",noteWord:"Tekst",reportLang:"Rapportsprog:",hTake:"Tryk 📷 Tag billede for at måle i ro — eller mål direkte",hFrozen:"Klik for at måle på stillbilledet",hPick:"Vælg et billede",hCal2:"Sæt <b>2 punkter</b> på reference",hCalFirst:"Kalibrér først",hSetPts:"sæt",hPts:"punkter",hPt:"punkt",aStep1:"Klik <b>2 punkter</b> langs <b>plade 1</b>",aStep2:"Klik <b>2. punkt</b> på <b>plade 1</b>",aStep3:"Klik <b>2 punkter</b> langs <b>plade 2</b>",aStep4:"Klik <b>2. punkt</b> på <b>plade 2</b>",aStep5:"<b>Træk fra hjørnet</b> ud til sømfladen — slip ved a-toppen",aDone:"Færdig — a beregnet. Cap er valgfri.",capClick:"📐 Klik på <b>toppen af cappen</b>",rTitle:"WeldGauge — målerapport",rOper:"Operatør",rJob:"Emne/WPS",rDate:"Dato",rStd:"Standard",rImgs:"Billeder",rMeas:"Målinger",rAss:"Vurderinger",rConcl:"Konklusion",rAllOk:"Alle {n} vurderinger OK",rFail:"{f} af {n} vurderinger afvist",rNoAss:"ingen vurderinger",rMeasH:"Målinger",rAssH:"Vurderinger (ISO 5817:2023)",rImgsH:"Billeder",rType:"Type",rValue:"Værdi",rFault:"Fejltype",rWeld:"Søm",rLevel:"Niveau",rMeasured:"Målt",rLimit:"Grænse",rVerdict:"Vurdering",rOk:"OK",rRej:"AFVIST",rFillet:"Kantsøm",rButt:"Stuksøm",rImg:"Billede",rMarks:"markeringer",rPrint:"Udskriv / Gem som PDF",rFoot:"Genereret med WeldGauge. Skala kalibreret med reference i billedplan. a-mål og indre fejl vurderes på makrosnit; z-baseret a er estimat (kun ikke-konkave kantsømme). Verificér mod kontrolleret standardkopi før endelig dokumentation."},
+    en:{src:"Source",srcLive:"📷 Live camera",srcUpload:"🖼 Upload image",rear:"📷 Rear camera",front:"🤳 Front camera",saveExp:"Save & export",dlAll:"⬇ Download all images",report:"Report",genReport:"📄 Generate report",exportZip:"📦 Export case (ZIP: images + report)",storage:"Storage",pickFolder:"📁 Choose folder on PC",clearGal:"🗑 Clear gallery",login:"Log in",app:"App",keepAwake:"Keep screen on while in use",measure:"📏 Measure",assess:"✓ Assessment",calRuler:"Ruler (2 points)",calMarker:"Calibration marker",caseHead:"Case — applies to all assessments",undo:"↶ Undo last",takePhoto:"📷 Take photo",addCap:"➕ Add cap (reinforcement)",saveGal:"💾 Save to gallery",noteWord:"Text",reportLang:"Report language:",hTake:"Tap 📷 Take photo to measure steadily — or measure directly",hFrozen:"Click to measure on the still image",hPick:"Choose an image",hCal2:"Set <b>2 points</b> on the reference",hCalFirst:"Calibrate first",hSetPts:"set",hPts:"points",hPt:"point",aStep1:"Click <b>2 points</b> along <b>plate 1</b>",aStep2:"Click <b>2nd point</b> on <b>plate 1</b>",aStep3:"Click <b>2 points</b> along <b>plate 2</b>",aStep4:"Click <b>2nd point</b> on <b>plate 2</b>",aStep5:"<b>Drag from the corner</b> out to the weld face — release at the throat",aDone:"Done — a calculated. Cap is optional.",capClick:"📐 Click the <b>top of the cap</b>",rTitle:"WeldGauge — measurement report",rOper:"Operator",rJob:"Item/WPS",rDate:"Date",rStd:"Standard",rImgs:"Images",rMeas:"Measurements",rAss:"Assessments",rConcl:"Conclusion",rAllOk:"All {n} assessments OK",rFail:"{f} of {n} assessments rejected",rNoAss:"no assessments",rMeasH:"Measurements",rAssH:"Assessments (ISO 5817:2023)",rImgsH:"Images",rType:"Type",rValue:"Value",rFault:"Imperfection",rWeld:"Weld",rLevel:"Level",rMeasured:"Measured",rLimit:"Limit",rVerdict:"Verdict",rOk:"OK",rRej:"REJECTED",rFillet:"Fillet",rButt:"Butt",rImg:"Image",rMarks:"marks",rPrint:"Print / Save as PDF",rFoot:"Generated with WeldGauge. Scale calibrated with a reference in the image plane. Throat a and internal imperfections are assessed on macro sections; z-based a is an estimate (non-concave fillets only). Verify against a controlled standard copy before final documentation."},
+    lt:{src:"Šaltinis",srcLive:"📷 Tiesioginė kamera",srcUpload:"🖼 Įkelti vaizdą",rear:"📷 Galinė kamera",front:"🤳 Priekinė kamera",saveExp:"Išsaugoti ir eksportuoti",dlAll:"⬇ Atsisiųsti visus vaizdus",report:"Ataskaita",genReport:"📄 Generuoti ataskaitą",exportZip:"📦 Eksportuoti bylą (ZIP: vaizdai + ataskaita)",storage:"Saugykla",pickFolder:"📁 Pasirinkti aplanką",clearGal:"🗑 Išvalyti galeriją",login:"Prisijungti",app:"Programa",keepAwake:"Neleisti ekranui užgesti",measure:"📏 Matavimas",assess:"✓ Vertinimas",calRuler:"Liniuotė (2 taškai)",calMarker:"Kalibravimo žyma",caseHead:"Byla — taikoma visiems vertinimams",undo:"↶ Atšaukti paskutinį",takePhoto:"📷 Fotografuoti",addCap:"➕ Pridėti perdangą",saveGal:"💾 Išsaugoti galerijoje",noteWord:"Tekstas",reportLang:"Ataskaitos kalba:",hTake:"Spauskite 📷 Fotografuoti, kad matuotumėte tiksliai — arba matuokite tiesiogiai",hFrozen:"Spustelėkite, kad matuotumėte nuotraukoje",hPick:"Pasirinkite vaizdą",hCal2:"Pažymėkite <b>2 taškus</b> ant etalono",hCalFirst:"Pirma kalibruokite",hSetPts:"pažymėkite",hPts:"taškus",hPt:"tašką",aStep1:"Spustelėkite <b>2 taškus</b> palei <b>1 plokštę</b>",aStep2:"Spustelėkite <b>2-ą tašką</b> ant <b>1 plokštės</b>",aStep3:"Spustelėkite <b>2 taškus</b> palei <b>2 plokštę</b>",aStep4:"Spustelėkite <b>2-ą tašką</b> ant <b>2 plokštės</b>",aStep5:"<b>Tempkite nuo kampo</b> iki siūlės paviršiaus — paleiskite ties storiu",aDone:"Baigta — a apskaičiuotas. Perdanga neprivaloma.",capClick:"📐 Spustelėkite <b>perdangos viršų</b>",rTitle:"WeldGauge — matavimo ataskaita",rOper:"Operatorius",rJob:"Detalė/WPS",rDate:"Data",rStd:"Standartas",rImgs:"Vaizdai",rMeas:"Matavimai",rAss:"Vertinimai",rConcl:"Išvada",rAllOk:"Visi {n} vertinimai OK",rFail:"{f} iš {n} vertinimų atmesta",rNoAss:"nėra vertinimų",rMeasH:"Matavimai",rAssH:"Vertinimai (ISO 5817:2023)",rImgsH:"Vaizdai",rType:"Tipas",rValue:"Reikšmė",rFault:"Defektas",rWeld:"Siūlė",rLevel:"Lygis",rMeasured:"Išmatuota",rLimit:"Riba",rVerdict:"Vertinimas",rOk:"OK",rRej:"ATMESTA",rFillet:"Kampinė",rButt:"Sandūrinė",rImg:"Vaizdas",rMarks:"žymos",rPrint:"Spausdinti / Įrašyti PDF",rFoot:"Sukurta su WeldGauge. Mastelis kalibruotas pagal etaloną vaizdo plokštumoje. Storis a ir vidiniai defektai vertinami makrošlifuose; z pagrindu apskaičiuotas a yra įvertis (tik neįgaubtoms kampinėms siūlėms). Prieš galutinį dokumentavimą patikrinkite pagal kontroliuojamą standarto kopiją."}
+  };
+  function detectLang(){try{const saved=localStorage.getItem("wg_lang");if(saved&&I18N[saved])return saved;}catch(e){}
+    const n=(navigator.language||navigator.userLanguage||"da").slice(0,2).toLowerCase();return I18N[n]?n:"da";}
+  let lang=detectLang();
+  // Fejltype-/værktøjsnavne pr. sprog (ISO 5817:2023-terminologi)
+  const NAMES={
+    m_length:{da:"Længde",en:"Length",lt:"Ilgis"},
+    m_diam:{da:"Diameter",en:"Diameter",lt:"Skersmuo"},
+    m_leg:{da:"Benlængde (z)",en:"Leg length (z)",lt:"Statinio ilgis (z)"},
+    m_angle:{da:"Vinkel",en:"Angle",lt:"Kampas"},
+    m_p2l:{da:"Punkt → linje",en:"Point → line",lt:"Taškas → linija"},
+    m_note:{da:"📝 Tekst / note",en:"📝 Text / note",lt:"📝 Tekstas / pastaba"},
+    m_athroat:{da:"a-mål (konstruktion, kantsøm)",en:"Throat a (construction, fillet)",lt:"Kampinės siūlės storis a (konstrukcija)"},
+    amaal:{da:"a-mål (5213/5214)",en:"Throat a (5213/5214)",lt:"Storis a (5213/5214)"},
+    zlegs:{da:"a-mål via z-ben",en:"Throat a via z-legs",lt:"Storis a per statinius z"},
+    pore_s:{da:"Overfladepore (2017)",en:"Surface pore (2017)",lt:"Paviršinė pora (2017)"},
+    undercut:{da:"Sidekærv (5011/5012)",en:"Undercut (5011/5012)",lt:"Pakraštinė įpjova (5011/5012)"},
+    convex:{da:"Konveks søm (503)",en:"Excessive convexity (503)",lt:"Per didelis išgaubtumas (503)"},
+    excess_butt:{da:"Overvulst (502)",en:"Excess weld metal (502)",lt:"Siūlės perteklius (502)"},
+    excess_pen:{da:"Gennemløb (504)",en:"Excess penetration (504)",lt:"Per gilus pralydymas (504)"},
+    unequal:{da:"Ulige ben (512)",en:"Unequal legs (512)",lt:"Nelygūs statiniai (512)"},
+    toe:{da:"Overgangsvinkel (505)",en:"Toe angle (505)",lt:"Perėjimo kampas (505)"},
+    overlap:{da:"Overløb (506)",en:"Overlap (506)",lt:"Užliejimas (506)"},
+    sagging:{da:"Nedløbet (509)",en:"Sagging (509)",lt:"Įdubimas (509)"},
+    shrink:{da:"Krympefuge (5013)",en:"Shrinkage groove (5013)",lt:"Susitraukimo griovelis (5013)"},
+    root_conc:{da:"Indadhvælving rod (515)",en:"Root concavity (515)",lt:"Šaknies įgaubtumas (515)"},
+    root_inc:{da:"Rodfejl 1-sidet stuksøm (4021)",en:"Incomplete root (4021)",lt:"Nepilna šaknis (4021)"},
+    aA:{da:"aA (sæt reference)",en:"aA (set reference)",lt:"aA (nustatyti etaloną)"},
+    a_fillet:{da:"a-mål kantsøm (konstruktion)",en:"Throat a, fillet (construction)",lt:"Kampinės siūlės storis a (konstrukcija)"},
+    a_butt:{da:"a-mål stuksøm (gods)",en:"Throat a, butt (thickness)",lt:"Sandūrinės siūlės storis a"},
+    pore_i:{da:"Indre pore (2.3b)",en:"Internal pore (2.3b)",lt:"Vidinė pora (2.3b)"},
+    incl:{da:"Indeslutning (2.9)",en:"Inclusion (2.9)",lt:"Intarpas (2.9)"},
+    lof:{da:"Bindingsfejl (2.12)",en:"Lack of fusion (2.12)",lt:"Nesusilydymas (2.12)"},
+    ip_t:{da:"Rodfejl T-samling (2.13)",en:"Incomplete root, T-joint (2.13)",lt:"Nepilna šaknis, T sandūra (2.13)"},
+    lack_pen:{da:"Mangl. indtrængning (402)",en:"Lack of penetration (402)",lt:"Nepakankamas pralydymas (402)"}
+  };
+  function nameOf(k,l){const e=NAMES[k];const lg=l||lang;return e?(e[lg]||e.da):(DEF[k]?DEF[k].name:k);}
+  function applyLang(){const t=I18N[lang]||I18N.da;document.querySelectorAll("[data-i18n]").forEach(el=>{const k=el.getAttribute("data-i18n");if(t[k]!=null)el.textContent=t[k];});
+    try{localStorage.setItem("wg_lang",lang);}catch(e){}const sel=$("langSel");if(sel)sel.value=lang;document.documentElement.lang=lang;}
 
   function fmt(mm){return mm>=100?mm.toFixed(1):mm.toFixed(2);}
   function pick(L,m){return m[L];}function notP(L){return"ikke tilladt ("+L+")";}
@@ -333,10 +380,10 @@
     $("caseCard").style.display=mode==="assess"?"flex":"none";$("ctxSeg").style.display=mode==="assess"?"flex":"none";$("toolLabel").textContent=mode==="assess"?"Fejltype":"Måletype";placing=[];fillFaults();setHint();draw();}));
   document.querySelectorAll("#ctxSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#ctxSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");ctxMode=b.dataset.ctx;placing=[];fillFaults();setHint();draw();}));
   function fillFaults(){const sel=$("faultSelect");sel.innerHTML="";const grp=mode==="measure"?"measure":ctxMode;
-    Object.keys(DEF).filter(k=>DEF[k].grp===grp).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=DEF[k].name;sel.appendChild(o);});
+    Object.keys(DEF).filter(k=>DEF[k].grp===grp).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=nameOf(k);sel.appendChild(o);});
     fault=sel.value;$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";}
   $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];capTarget=null;$("capBtn").style.display="none";$("concaveWrap").style.display=DEF[fault].concave?"flex":"none";setHint();draw();});
-  $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("Klik på toppen af cappen (svejsningens overflade).");$("hint").innerHTML="📐 Klik på <b>toppen af cappen</b>";$("hint").style.display="block";});
+  $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("");$("hint").innerHTML=(I18N[lang]||I18N.da).capClick;$("hint").style.display="block";});
 
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
@@ -472,11 +519,11 @@
     handle(rc,"#a371f7");handle(sc,cvv("--violet"));label(sc,"a="+fmt(a)+" mm",cvv("--violet"));}
   overlay.addEventListener("mousedown",down);overlay.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
   overlay.addEventListener("touchstart",down,{passive:false});overlay.addEventListener("touchmove",move,{passive:false});window.addEventListener("touchend",up);
-  function showResult(m){const ro=$("readout");if(DEF[m.type].mt==="note"){ro.innerHTML='<span class="big">📝 '+(m.text||"(tom)")+'</span>';ro.classList.add("show");return;}const r=evalMark(m);const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+DEF[m.type].name+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
+  function showResult(m){const ro=$("readout");if(DEF[m.type].mt==="note"){ro.innerHTML='<span class="big">📝 '+(m.text||"(tom)")+'</span>';ro.classList.add("show");return;}const r=evalMark(m);const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+nameOf(m.type)+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
   function renderMarks(){const card=$("defectsCard"),list=$("dlist");card.style.display=marks.length?"flex":"none";$("defCount").textContent=marks.length?("("+marks.length+")"):"";$("undoBtn").disabled=!(marks.length||placing.length);list.innerHTML="";
     marks.forEach((m,i)=>{const isNote=DEF[m.type].mt==="note";const r=isNote?{disp:""}:evalMark(m);const dot=isNote?"#ffd166":m.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const row=document.createElement("div");row.className="ditem";
       const valTxt=isNote?("“"+(m.text||"")+"”"):r.disp;
-      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${i+1}. ${isNote?"Tekst":DEF[m.type].name}</span><span class="vl">${valTxt}</span>${isNote?`<button data-edit="${i}">✎</button>`:""}<button data-del="${i}">✕</button>`;
+      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${i+1}. ${isNote?(I18N[lang].noteWord||"Tekst"):nameOf(m.type)}</span><span class="vl">${valTxt}</span>${isNote?`<button data-edit="${i}">✎</button>`:""}<button data-del="${i}">✕</button>`;
       row.querySelector("[data-del]").addEventListener("click",()=>{marks.splice(i,1);renderMarks();draw();});
       const eb=row.querySelector("[data-edit]");if(eb)eb.addEventListener("click",()=>{const t=prompt("Rediger tekst:",m.text||"");if(t!==null){m.text=t;renderMarks();draw();}});
       list.appendChild(row);});}
@@ -503,11 +550,11 @@
   $("useAAbtn").addEventListener("click",()=>{const last=[...marks].reverse().find(m=>m.type==="aA");if(last){$("aARef").value=(dist(last.pts[0],last.pts[1])*mmPerPx).toFixed(2);renderMarks();draw();setStatus("aA sat fra seneste aA-måling.");}else setStatus("Mål aA først (Vurdering → Makrosnit → aA).");});
   $("undoBtn").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
 
-  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Tag billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
-    if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
+  function setHint(){const h=$("hint");const t=I18N[lang]||I18N.da;if(!ready()){h.innerHTML=source==="live"?(frozen?t.hFrozen:t.hTake):t.hPick;h.style.display="block";return;}
+    if(calibrating){h.innerHTML=t.hCal2;h.style.display="block";return;}if(!mmPerPx){h.innerHTML=t.hCalFirst;h.style.display="block";return;}
     const d=DEF[fault];
-    if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b>","Klik <b>2. punkt</b> på <b>plade 1</b>","Klik <b>2 punkter</b> langs <b>plade 2</b>","Klik <b>2. punkt</b> på <b>plade 2</b>","<b>Træk fra hjørnet</b> ud til sømfladen — slip ved a-toppen"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet. Cap er valgfri.");h.style.display="block";return;}
-    let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
+    if(d.mt==="athroat"){const n=placing.length;const steps=[t.aStep1,t.aStep2,t.aStep3,t.aStep4,t.aStep5];h.innerHTML="📐 "+(steps[n]||t.aDone);h.style.display="block";return;}
+    let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${nameOf(fault)}</b> — ${t.hSetPts} ${d.n} ${d.n>1?t.hPts:t.hPt}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
   function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
 
@@ -598,29 +645,30 @@
   function closeEditor(){editIndex=-1;$("editbar").classList.remove("show");$("snapBtn").disabled=false;if(prevState){source=prevState.source;zoom=prevState.zoom;$("zoom").value=zoom;$("zoomVal").textContent=zoom.toFixed(1)+"×";calPts=prevState.calPts;marks=prevState.marks;mmPerPx=prevState.mmPerPx;fault=prevState.fault;mode=prevState.mode;ctxMode=prevState.ctxMode;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.toggle("active",x.dataset.src===source));}still.src="";switchSource();if(source==="live"){still.style.display="none";video.style.display="block";}setStatus("Redigering lukket.");setHint();renderMarks();syncCanvas();draw();}
 
   /* ============ RAPPORT ============ */
-  function buildReportHTML(){const op=$("rpOperator").value||"—",job=$("rpJob").value||"—",date=new Date().toLocaleString("da-DK");
+  function buildReportHTML(rlang){const t=I18N[rlang||lang]||I18N.da;const lng=rlang||lang;const op=$("rpOperator").value||"—",job=$("rpJob").value||"—",date=new Date().toLocaleString(lng==="en"?"en-GB":lng==="lt"?"lt-LT":"da-DK");
     let mRows="",aRows="",imgs="",nA=0,nFail=0,nM=0;
     captures.forEach((c,ci)=>{c.marks.forEach((m,i)=>{const r=c.results[i];const def=DEF[m.type];
-      if(def.kind==="measure"){nM++;mRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${r.disp}</td></tr>`;}
-      else{nA++;if(r.ok===false)nFail++;const vd=r.ok===true?'<span style="color:#1a7f37;font-weight:700">OK</span>':r.ok===false?'<span style="color:#cf222e;font-weight:700">AFVIST</span>':'—';aRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${c.params.wt==="fillet"?"Kantsøm":"Stuksøm"}</td><td>${c.params.L}</td><td>${r.disp}</td><td>${r.allowTxt||"—"}</td><td>${vd}</td></tr>`;}});
-      imgs+=`<figure><img src="${c.thumb||c.img}"><figcaption>Billede ${ci+1} — ${c.marks.length} markeringer${c.caption?" · "+c.caption:""}</figcaption></figure>`;});
-    const concl=nA?(nFail>0?`<span style="color:#cf222e;font-weight:700">${nFail} af ${nA} vurderinger afvist</span>`:`<span style="color:#1a7f37;font-weight:700">Alle ${nA} vurderinger OK</span>`):"ingen vurderinger";
-    const mSec=nM?`<h2>Målinger</h2><table><thead><tr><th>#</th><th>Type</th><th>Værdi</th></tr></thead><tbody>${mRows}</tbody></table>`:"";
-    const aSec=nA?`<h2>Vurderinger (ISO 5817:2023)</h2><table><thead><tr><th>#</th><th>Fejltype</th><th>Søm</th><th>Niveau</th><th>Målt</th><th>Grænse</th><th>Vurdering</th></tr></thead><tbody>${aRows}</tbody></table>`:"";
-    return `<!DOCTYPE html><html lang="da"><head><meta charset="utf-8"><title>Målerapport</title><style>
+      if(def.kind==="measure"){nM++;mRows+=`<tr><td>${ci+1}.${i+1}</td><td>${nameOf(m.type,lng)}</td><td>${r.disp}</td></tr>`;}
+      else{nA++;if(r.ok===false)nFail++;const vd=r.ok===true?`<span style="color:#1a7f37;font-weight:700">${t.rOk}</span>`:r.ok===false?`<span style="color:#cf222e;font-weight:700">${t.rRej}</span>`:'—';aRows+=`<tr><td>${ci+1}.${i+1}</td><td>${nameOf(m.type,lng)}</td><td>${c.params.wt==="fillet"?t.rFillet:t.rButt}</td><td>${c.params.L}</td><td>${r.disp}</td><td>${r.allowTxt||"—"}</td><td>${vd}</td></tr>`;}});
+      imgs+=`<figure><img src="${c.thumb||c.img}"><figcaption>${t.rImg} ${ci+1} — ${c.marks.length} ${t.rMarks}${c.caption?" · "+c.caption:""}</figcaption></figure>`;});
+    const concl=nA?(nFail>0?`<span style="color:#cf222e;font-weight:700">${t.rFail.replace("{f}",nFail).replace("{n}",nA)}</span>`:`<span style="color:#1a7f37;font-weight:700">${t.rAllOk.replace("{n}",nA)}</span>`):t.rNoAss;
+    const mSec=nM?`<h2>${t.rMeasH}</h2><table><thead><tr><th>#</th><th>${t.rType}</th><th>${t.rValue}</th></tr></thead><tbody>${mRows}</tbody></table>`:"";
+    const aSec=nA?`<h2>${t.rAssH}</h2><table><thead><tr><th>#</th><th>${t.rFault}</th><th>${t.rWeld}</th><th>${t.rLevel}</th><th>${t.rMeasured}</th><th>${t.rLimit}</th><th>${t.rVerdict}</th></tr></thead><tbody>${aRows}</tbody></table>`:"";
+    return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${t.rTitle}</title><style>
 body{font-family:Segoe UI,Arial,sans-serif;color:#111;margin:32px}h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:#444;border-bottom:1px solid #ccc;padding-bottom:4px;margin-top:24px}
 .meta{font-size:13px;margin-bottom:6px}.meta b{color:#000}table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}th{background:#f0f0f0}
 figure{display:inline-block;width:31%;margin:1%;vertical-align:top}img{width:100%;border:1px solid #ccc;border-radius:4px}figcaption{font-size:11px;color:#333}.foot{margin-top:22px;font-size:10px;color:#777;border-top:1px solid #ccc;padding-top:6px}@media print{button{display:none}}</style></head><body>
-<h1>WeldGauge — målerapport</h1>
-<div class="meta"><b>Operatør:</b> ${op} · <b>Emne/WPS:</b> ${job} · <b>Dato:</b> ${date}</div>
-<div class="meta"><b>Standard:</b> ISO 5817:2023 · <b>Billeder:</b> ${captures.length} · <b>Målinger:</b> ${nM} · <b>Vurderinger:</b> ${nA} · <b>Konklusion:</b> ${concl}</div>
-<button onclick="window.print()" style="margin:10px 0;padding:8px 14px">Udskriv / Gem som PDF</button>
-${mSec}${aSec}<h2>Billeder</h2>${imgs}
-<div class="foot">Genereret med WeldGauge. Skala kalibreret med reference i billedplan. a-mål og indre fejl vurderes på makrosnit; z-baseret a er estimat (kun ikke-konkave kantsømme). Verificér mod kontrolleret standardkopi før endelig dokumentation.</div></body></html>`;}
-  $("reportBtn").addEventListener("click",()=>{const rdy=captures.map(c=>new Promise(res=>{if(c.thumb)res();else makeThumb(c,u=>{c.thumb=u;res();});}));
-    Promise.all(rdy).then(async()=>{const html=buildReportHTML();
-      if(!isMobile&&hasFS&&dirHandle){const ok=await writeToFolder("maalerapport.html",new Blob([html],{type:"text/html"}));setStatus(ok?"Rapport skrevet til mappen som maalerapport.html.":"Kunne ikke skrive rapport til mappen.");}
-      const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}else if(!(hasFS&&dirHandle)){const b=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="maalerapport.html";a.click();}});});
+<h1>${t.rTitle}</h1>
+<div class="meta"><b>${t.rOper}:</b> ${op} · <b>${t.rJob}:</b> ${job} · <b>${t.rDate}:</b> ${date}</div>
+<div class="meta"><b>${t.rStd}:</b> ISO 5817:2023 · <b>${t.rImgs}:</b> ${captures.length} · <b>${t.rMeas}:</b> ${nM} · <b>${t.rAss}:</b> ${nA} · <b>${t.rConcl}:</b> ${concl}</div>
+<button onclick="window.print()" style="margin:10px 0;padding:8px 14px">${t.rPrint}</button>
+${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
+<div class="foot">${t.rFoot}</div></body></html>`;}
+  function genReport(rlang){const rdy=captures.map(c=>new Promise(res=>{if(c.thumb)res();else makeThumb(c,u=>{c.thumb=u;res();});}));
+    Promise.all(rdy).then(async()=>{const html=buildReportHTML(rlang);
+      if(!isMobile&&hasFS&&dirHandle){const ok=await writeToFolder("weldgauge-rapport-"+rlang+".html",new Blob([html],{type:"text/html"}));setStatus(ok?"Rapport gemt i mappen.":"Kunne ikke skrive rapport til mappen.");}
+      const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}else if(!(hasFS&&dirHandle)){const b=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="weldgauge-rapport-"+rlang+".html";a.click();}});}
+  document.querySelectorAll("[data-rep]").forEach(b=>b.addEventListener("click",()=>{if(!captures.length){setStatus("Ingen billeder endnu.");return;}genReport(b.dataset.rep);}));
 
   // ---- ZIP (store/no-compression) til eksport af hel sag ----
   function crc32(buf){let c,t=crc32.t;if(!t){t=crc32.t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}let crc=0^(-1);for(let i=0;i<buf.length;i++)crc=(crc>>>8)^t[(crc^buf[i])&0xFF];return(crc^(-1))>>>0;}
@@ -837,6 +885,8 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   // gendan gemte billeder på telefon
   if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();pruneExpired();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
   // Live er standard på alle platforme; kameraet starter automatisk
+  $("langSel").addEventListener("change",e=>{lang=e.target.value;applyLang();fillFaults();});
+  applyLang();
   source="live";switchSource();
   if(!isMobile)setStatus("Kameraet kører. Kalibrér, vælg Måling/Vurdering, og klik. Kilde, gem og indstillinger ligger i ☰-menuen øverst.");
   else setStatus("Kameraet kører. Kalibrér og mål. Kilde og indstillinger ligger i ☰-menuen.");
