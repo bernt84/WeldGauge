@@ -50,7 +50,13 @@
   .readout .verdict{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:5px;font-size:12px;font-weight:700;vertical-align:middle}
   .readout .verdict.ok{background:rgba(46,160,67,.2);color:var(--green);border:1px solid var(--green)}
   .readout .verdict.no{background:rgba(248,81,73,.2);color:var(--red);border:1px solid var(--red)}
-  .controls{background:var(--panel);border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:9px;max-height:60vh;overflow-y:auto}
+  .controls{background:var(--panel);border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:9px;max-height:62vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  @media (max-width:820px){
+    html,body{height:auto;min-height:100%;overflow-y:auto;overscroll-behavior:auto}
+    body{display:block}
+    .stage{position:relative;height:42vh;flex:none}
+    .controls{max-height:none;overflow:visible}
+  }
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .row label{font-size:12px;color:var(--ink-dim);white-space:nowrap}
   select,input[type=number],input[type=text]{background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:8px 10px;font-size:14px;font-family:inherit;outline:none}
@@ -191,7 +197,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.9.0 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.9.2 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
