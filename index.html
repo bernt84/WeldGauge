@@ -119,6 +119,7 @@
     <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
 
     <h2>Gem &amp; eksport</h2>
+    <div class="mini" id="exportEmpty" style="margin-bottom:6px">Tag et billede først — så kan du hente billeder, lave rapport og eksportere sagen.</div>
     <div class="btn-grid"><button class="ghost" id="downloadAllBtn">⬇ Hent alle billeder</button></div>
     <div class="card" id="reportCard" style="display:none">
       <h3>Rapport</h3>
@@ -174,7 +175,7 @@
     <div class="card" id="appCard">
       <button class="primary" id="installBtn" style="display:none">⬇ Installér app</button>
       <div class="mini" id="installHint"></div>
-      <label class="chk"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
+      <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> Hold skærmen tændt under brug</label>
     </div>
   </div>
 
@@ -209,7 +210,7 @@
     <div class="dlist" id="dlist"></div>
   </div>
 
-  <div class="btn-grid"><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>📸 Gem billede</button></div>
+  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Frys billede</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>📸 Gem billede</button></div>
 
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
@@ -275,7 +276,7 @@
     else{typeTxt="= nominel";ok=true;allowTxt="—";}
     return{val:a,disp:(est?"a≈":"a=")+a.toFixed(2)+" mm ("+typeTxt+")",ok,allowTxt};}
 
-  let source="live",stream=null,track=null,haveImage=false;
+  let source="live",stream=null,track=null,haveImage=false,frozen=false;
   let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
   let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false;
   let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1;
@@ -326,7 +327,12 @@
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
-    if(source==="upload"){stopCamera();video.style.display="none";}else{still.style.display="none";haveImage=false;video.style.display="block";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
+    if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Frys billede";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
+  function freezeFrame(){const{w:W,h:H}=mediaSize();if(!W||!video.videoWidth)return;const c=document.createElement("canvas");c.width=video.videoWidth;c.height=video.videoHeight;c.getContext("2d").drawImage(video,0,0,c.width,c.height);
+    still.onload=()=>{frozen=true;still.style.display="block";video.style.display="none";$("freezeBtn").textContent="🎥 Nyt foto (tilbage til live)";setHint();syncCanvas();draw();setStatus("Stillbillede frosset — mål i ro. Tryk 'Nyt foto' for at gå tilbage til live.");};
+    still.src=c.toDataURL("image/jpeg",.92);}
+  function unfreeze(){frozen=false;still.style.display="none";video.style.display="block";still.src="";marks=[];placing=[];$("freezeBtn").textContent="📷 Frys billede";renderMarks();setHint();syncCanvas();draw();if(stream)requestAnimationFrame(loop);}
+  $("freezeBtn").addEventListener("click",()=>{if(source!=="live")return;if(frozen)unfreeze();else freezeFrame();});
   function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
 
   /* ============ KAMERA ============ */
@@ -364,10 +370,11 @@
 
   /* ============ CANVAS ============ */
   let mr={x:0,y:0,w:0,h:0,sx:1};
-  function mediaSize(){if((source==="upload"||editIndex>=0)&&still.naturalWidth)return{w:still.naturalWidth,h:still.naturalHeight};return{w:video.videoWidth,h:video.videoHeight};}
+  function useStill(){return source==="upload"||editIndex>=0||frozen;}
+  function mediaSize(){if(useStill()&&still.naturalWidth)return{w:still.naturalWidth,h:still.naturalHeight};return{w:video.videoWidth,h:video.videoHeight};}
   function syncCanvas(){const r=stage.getBoundingClientRect();overlay.width=Math.round(r.width*dpr);overlay.height=Math.round(r.height*dpr);overlay.style.width=r.width+"px";overlay.style.height=r.height+"px";
-    const{w:vw,h:vh}=mediaSize();if(vw&&vh){const cw=overlay.width,ch=overlay.height;const sc=Math.min(cw/vw,ch/vh)*zoom;mr={x:(cw-vw*sc)/2,y:(ch-vh*sc)/2,w:vw*sc,h:vh*sc,sx:sc};const el=(source==="upload"||editIndex>=0)?still:video;el.style.transform=zoom>1?`scale(${zoom})`:"none";}}
-  function loop(){syncCanvas();draw();if(stream&&source==="live"&&editIndex<0)requestAnimationFrame(loop);}
+    const{w:vw,h:vh}=mediaSize();if(vw&&vh){const cw=overlay.width,ch=overlay.height;const sc=Math.min(cw/vw,ch/vh)*zoom;mr={x:(cw-vw*sc)/2,y:(ch-vh*sc)/2,w:vw*sc,h:vh*sc,sx:sc};const el=useStill()?still:video;el.style.transform=zoom>1?`scale(${zoom})`:"none";}}
+  function loop(){syncCanvas();draw();if(stream&&source==="live"&&editIndex<0&&!frozen)requestAnimationFrame(loop);}
   function v2c(p){return{x:mr.x+p.x*mr.sx,y:mr.y+p.y*mr.sx};}
   function c2v(cx,cy){return{x:(cx*dpr-mr.x)/mr.sx,y:(cy*dpr-mr.y)/mr.sx};}
   function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
@@ -405,7 +412,7 @@
   function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 
   /* ============ INTERAKTION ============ */
-  function ready(){return editIndex>=0||(source==="live"&&stream)||(source==="upload"&&haveImage);}
+  function ready(){return editIndex>=0||(source==="live"&&stream)||(source==="upload"&&haveImage)||frozen;}
   function getXY(e){const r=overlay.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
   function hitTest(cx,cy){const tol=18;for(let di=0;di<marks.length;di++){const arr=marks[di].pts;for(let i=0;i<arr.length;i++){const cp=v2c(arr[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr,idx:i,mark:marks[di]};}}for(let i=0;i<placing.length;i++){const cp=v2c(placing[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:placing,idx:i};}for(let i=0;i<calPts.length;i++){const cp=v2c(calPts[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:calPts,idx:i,cal:true};}return null;}
   function down(e){if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
@@ -438,7 +445,7 @@
 
   $("detectBtn").addEventListener("click",()=>{if(!ready())return;if(source==="upload"||editIndex>=0){const r=detectOnce();if(r)applyMarker(r,1);else setStatus("Mærke ikke fundet.");return;}
     const samples=[];let n=0;setStatus("Detekterer over flere billeder…");const iv=setInterval(()=>{const r=detectOnce();if(r)samples.push(r);n++;if(n>=6){clearInterval(iv);if(samples.length<2){setStatus("Mærke ikke fundet stabilt. Brug solidt mørkt kvadrat på lys baggrund eller lineal.");return;}const sides=samples.map(s=>s.sidePx).sort((a,b)=>a-b);const med=sides[sides.length>>1];const best=samples.reduce((p,c)=>Math.abs(c.sidePx-med)<Math.abs(p.sidePx-med)?c:p);applyMarker(best,samples.length);}},180);});
-  function detectOnce(){const{w:W,h:H}=mediaSize();if(!W)return null;const maxW=900,sc=Math.min(1,maxW/W),w=Math.round(W*sc),h=Math.round(H*sc);const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.drawImage((source==="upload"||editIndex>=0)?still:video,0,0,w,h);
+  function detectOnce(){const{w:W,h:H}=mediaSize();if(!W)return null;const maxW=900,sc=Math.min(1,maxW/W),w=Math.round(W*sc),h=Math.round(H*sc);const c=document.createElement("canvas");c.width=w;c.height=h;const g=c.getContext("2d");g.drawImage(useStill()?still:video,0,0,w,h);
     const img=g.getImageData(0,0,w,h).data,gray=new Uint8Array(w*h),hist=new Array(256).fill(0);for(let i=0,p=0;i<img.length;i+=4,p++){const v=(img[i]*.299+img[i+1]*.587+img[i+2]*.114)|0;gray[p]=v;hist[v]++;}
     const tot=w*h;let sum=0;for(let i=0;i<256;i++)sum+=i*hist[i];let sB=0,wB=0,mv=0,thr=128;for(let i=0;i<256;i++){wB+=hist[i];if(!wB)continue;const wF=tot-wB;if(!wF)break;sB+=i*hist[i];const mB=sB/wB,mF=(sum-sB)/wF,vb=wB*wF*(mB-mF)*(mB-mF);if(vb>mv){mv=vb;thr=i;}}
     let n=0;for(let p=0;p<gray.length;p++)if(gray[p]<thr)n++;if(n<w*h*.005)return null;let pp=[{s:-1e9},{s:1e9},{s:-1e9},{s:1e9}];for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(gray[y*w+x]>=thr)continue;const su=x+y,di=x-y;if(su>pp[0].s)pp[0]={s:su,x,y};if(su<pp[1].s)pp[1]={s:su,x,y};if(di>pp[2].s)pp[2]={s:di,x,y};if(di<pp[3].s)pp[3]={s:di,x,y};}
@@ -449,14 +456,14 @@
   $("useAAbtn").addEventListener("click",()=>{const last=[...marks].reverse().find(m=>m.type==="aA");if(last){$("aARef").value=(dist(last.pts[0],last.pts[1])*mmPerPx).toFixed(2);renderMarks();draw();setStatus("aA sat fra seneste aA-måling.");}else setStatus("Mål aA først (Vurdering → Makrosnit → aA).");});
   $("undoBtn").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
 
-  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?"Kameraet starter… giv adgang hvis browseren spørger":"Vælg et billede";h.style.display="block";return;}
+  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Frys billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];let extra=d.mt==="p2l"?" (linje: 2, så punkt)":"";h.innerHTML=`<b>${d.name}</b> — sæt ${d.n} punkt${d.n>1?"er":""}${extra}`;h.style.display="block";}
   function setStatus(t){$("status").innerHTML=t;}
   function showErr(on,msg){$("err").classList.toggle("show",on);if(msg)$("errMsg").textContent="Kamerafejl: "+msg;}
 
   /* ============ CAPTURE ============ */
-  function rawDataURL(){const{w:W,h:H}=mediaSize();const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage((source==="upload"||editIndex>=0)?still:video,0,0,W,H);return{url:c.toDataURL("image/jpeg",.85),W,H};}
+  function rawDataURL(){const{w:W,h:H}=mediaSize();const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage(useStill()?still:video,0,0,W,H);return{url:c.toDataURL("image/jpeg",.85),W,H};}
   function annotate(g,cap){const lw=Math.max(3,cap.W/700);const ln=(P,Q,col)=>{g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([]);g.beginPath();g.moveTo(P.x,P.y);g.lineTo(Q.x,Q.y);g.stroke();[P,Q].forEach(pt=>{g.beginPath();g.arc(pt.x,pt.y,lw*2,0,7);g.fillStyle=col;g.fill();});};
     if(cap.calPts&&cap.calPts.length===2)ln(cap.calPts[0],cap.calPts[1],"#2ea043");g.font="bold "+Math.max(20,cap.W/50)+"px Segoe UI, sans-serif";g.textAlign="left";
     cap.marks.forEach((m,i)=>{const def=DEF[m.type];const p=m.pts;
@@ -478,6 +485,7 @@
   $("snapBtn").addEventListener("click",()=>{const{w}=mediaSize();if(!w)return;if(!marks.length){setStatus("Ingen markeringer endnu.");return;}
     const cap=buildCapture();captures.push(cap);renderGallery();
     makeThumb(cap,u=>{cap.thumb=u;renderGallery();persistCapture(cap);});
+    if(frozen){unfreeze();setStatus("Billede gemt. Klar til næste foto.");return;}
     if(!isMobile&&!(hasFS&&dirHandle))setStatus("Billede gemt i galleriet. Vælg evt. en mappe for at skrive til disk, eller brug Hent billeder.");});
 
   function expiryBadge(c){
@@ -487,6 +495,7 @@
     const col=days<=3?'#ffb000':'#2ea043';
     return '<div class="tlabel" style="color:'+col+'">⏳ '+days+' dg · '+c.marks.length+' mark.</div>';}
   function renderGallery(){const g=$("gallery"),t=$("thumbs");g.classList.toggle("show",captures.length>0);$("reportCard").style.display=captures.length>0?"flex":"none";
+    {const ee=$("exportEmpty");if(ee)ee.style.display=captures.length?"none":"block";}
     const soon=captures.filter(c=>!c.keep&&c.created&&(c.created+LIFETIME_MS-Date.now())<7*864e5).length;
     $("galCount").innerHTML=captures.length+(soon?(' · <span style="color:#ffb000">⚠ '+soon+' udløber snart</span>'):'');
     t.innerHTML="";
@@ -523,7 +532,7 @@
     if(changed)renderGallery();}
   setInterval(pruneExpired,60000);
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")pruneExpired();});
-  $("downloadAllBtn").addEventListener("click",()=>{captures.forEach((cap,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=cap.thumb||cap.img;a.download="makro-"+(i+1)+".jpg";a.click();},i*350));});
+  $("downloadAllBtn").addEventListener("click",()=>{if(!captures.length){setStatus("Ingen billeder endnu — tag et billede først.");$("installHint");return;}captures.forEach((cap,i)=>setTimeout(()=>{const a=document.createElement("a");a.href=cap.thumb||cap.img;a.download="weldgauge-"+(i+1)+".jpg";a.click();},i*350));});
   $("clearGalBtn").addEventListener("click",()=>{captures=[];if(isMobile)idbClear();renderGallery();});
 
   /* ============ ÅBN / REDIGÉR ============ */
@@ -754,18 +763,19 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$("installBtn").style.display="flex";$("installHint").textContent="Installér for at få appen på hjemmeskærm/skrivebord.";});
   $("installBtn").addEventListener("click",async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();try{await deferredPrompt.userChoice;}catch(e){}deferredPrompt=null;$("installBtn").style.display="none";});
-  window.addEventListener('appinstalled',()=>{$("installBtn").style.display="none";$("installHint").textContent="✓ App installeret.";});
-  if(standalone){$("appCard").querySelector("h3").textContent="App ✓ installeret";$("installHint").textContent="Kører som app.";}
-  else if(isIOS){$("installHint").innerHTML="På iPhone/iPad: tryk <b>Del</b>-knappen → <b>Føj til hjemmeskærm</b>.";}
+  window.addEventListener('appinstalled',()=>{$("installBtn").style.display="none";$("installHint").textContent="✓ Installeret. Åbn WeldGauge fra ikonet.";});
+  if(standalone){$("installBtn").style.display="none";$("installHint").textContent="✓ Kører som installeret app.";}
+  else if(isIOS){$("installHint").innerHTML="På iPhone/iPad: tryk <b>Del</b> → <b>Føj til hjemmeskærm</b>.";}
+  else{$("installHint").textContent="Hvis app allerede er installeret, åbnes den fra ikonet. Ellers vis installér-knap her når browseren tillader det.";}
 
-  // --- Hold skærmen tændt (ingen dvale) ---
+  // --- Hold skærmen tændt (kun relevant på mobil) ---
   let wakeLock=null;
-  async function requestWake(){if(!$("wakeToggle").checked)return;if(!('wakeLock'in navigator))return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}catch(e){}}
+  if(!isMobile||!('wakeLock'in navigator)){const wr=$("wakeRow");if(wr)wr.style.display="none";}
+  async function requestWake(){if(!isMobile)return;if(!$("wakeToggle").checked)return;if(!('wakeLock'in navigator))return;try{wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}catch(e){}}
   function releaseWake(){if(wakeLock){try{wakeLock.release();}catch(e){}wakeLock=null;}}
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')requestWake();});
   $("wakeToggle").addEventListener("change",()=>{if($("wakeToggle").checked)requestWake();else releaseWake();});
   window.addEventListener('pointerdown',()=>requestWake(),{once:true});
-  if(!('wakeLock'in navigator)){$("wakeToggle").parentElement.style.opacity=".5";$("wakeToggle").disabled=true;$("wakeToggle").nextSibling&&($("wakeToggle").parentElement.title="Ikke understøttet i denne browser");}
 
   fillFaults();updateStoreInfo();
   if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}
