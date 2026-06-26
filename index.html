@@ -628,11 +628,23 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
     if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet, og prøv igen om et øjeblik.");return;}}
     sbStatus("Logger ind…");
     try{
-      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tidsudløb — ingen svar fra server (tjek internet/nøgle)")),15000));
-      const{data,error}=await Promise.race([sb.auth.signInWithPassword({email:em,password:pw}),timeout]);
-      if(error){console.error("WeldGauge login-fejl:",error);sbStatus("Login-fejl: "+(error.message||error.status||error));return;}
-      $("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
-    }catch(e){console.error("WeldGauge login-exception:",e);sbStatus("Login-fejl: "+(e.message||e));}}
+      // Direkte kald til auth-endpoint (uafhængigt af om biblioteket hænger)
+      const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),20000);
+      const res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{
+        method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY},
+        body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});
+      clearTimeout(to);
+      const j=await res.json().catch(()=>({}));
+      if(!res.ok){sbStatus("Login-fejl: "+(j.error_description||j.msg||j.error||("HTTP "+res.status)));return;}
+      // Giv tokens til klienten, så session gemmes og resten af appen virker
+      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}
+      // Hvis onAuthStateChange ikke fyrer, så anvend sessionen manuelt
+      try{const{data}=await sb.auth.getSession();await applySession(data.session||{user:j.user});}catch(e){await applySession({user:j.user});}
+      $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
+    }catch(e){
+      const msg=(e&&e.name==="AbortError")?"Tidsudløb — serveren svarede ikke (20s).":("Login-fejl: "+(e.message||e));
+      console.error("WeldGauge login:",e);sbStatus(msg);
+    }}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
