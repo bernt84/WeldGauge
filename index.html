@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.4</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.5 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -890,8 +890,11 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   window.addEventListener('pointerdown',()=>requestWake(),{once:true});
 
   fillFaults();updateStoreInfo();
-  if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').then(r=>{r.update();setInterval(()=>r.update(),30000);}).catch(()=>{});
-    let reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(reloaded)return;reloaded=true;location.reload();});});}
+  // MIDLERTIDIGT: afregistrér service worker og ryd al cache, så fastlåst gammel version forsvinder
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(rs=>{rs.forEach(r=>r.unregister());}).catch(()=>{});
+    if(window.caches&&caches.keys){caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});}
+  }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){showErr(true,"Browseren understøtter ikke kameraadgang. Brug Upload eller HTTPS.");}else{listCameras();navigator.mediaDevices.addEventListener?.("devicechange",refreshCams);}
   // gendan gemte billeder på telefon
   if(isMobile){idbAll().then(recs=>{if(!recs.length)return;recs.sort((a,b)=>(""+a.id).localeCompare(""+b.id));recs.forEach(rec=>{const cap=fromRecord(rec);captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});});renderGallery();pruneExpired();setStatus("Gendannede "+recs.length+" gemte billeder fra enheden.");});}
