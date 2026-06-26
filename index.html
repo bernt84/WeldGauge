@@ -124,6 +124,7 @@
       <div class="row"><label>Operatør</label><input type="text" id="rpOperator" placeholder="Navn"></div>
       <div class="row"><label>Emne/WPS</label><input type="text" id="rpJob" placeholder="Emne, ordre eller WPS-nr."></div>
       <button class="primary" id="reportBtn">📄 Generér rapport</button>
+      <button class="ghost" id="exportZipBtn">📦 Eksportér sag (ZIP: billeder + rapport)</button>
       <div class="note">Udskriftsklar rapport med separate afsnit for målinger og vurderinger. Browser → Udskriv → Gem som PDF. På PC med valgt mappe gemmes rapporten også der.</div>
     </div>
 
@@ -540,6 +541,28 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
       if(!isMobile&&hasFS&&dirHandle){const ok=await writeToFolder("maalerapport.html",new Blob([html],{type:"text/html"}));setStatus(ok?"Rapport skrevet til mappen som maalerapport.html.":"Kunne ikke skrive rapport til mappen.");}
       const w=window.open("","_blank");if(w){w.document.write(html);w.document.close();}else if(!(hasFS&&dirHandle)){const b=new Blob([html],{type:"text/html"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="maalerapport.html";a.click();}});});
 
+  // ---- ZIP (store/no-compression) til eksport af hel sag ----
+  function crc32(buf){let c,t=crc32.t;if(!t){t=crc32.t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}let crc=0^(-1);for(let i=0;i<buf.length;i++)crc=(crc>>>8)^t[(crc^buf[i])&0xFF];return(crc^(-1))>>>0;}
+  function makeZip(files){const enc=new TextEncoder();const chunks=[],central=[];let off=0;
+    const u16=n=>[n&255,(n>>8)&255],u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];
+    files.forEach(f=>{const name=enc.encode(f.name);const data=f.data;const crc=crc32(data);
+      const lh=[].concat(u32(0x04034b50),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0));
+      const lhb=new Uint8Array(lh);chunks.push(lhb,name,data);
+      const ch=[].concat(u32(0x02014b50),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off));
+      central.push(new Uint8Array(ch),name);off+=lhb.length+name.length+data.length;});
+    let cs=0;central.forEach(c=>cs+=c.length);let coff=off;
+    const end=new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(cs),u32(coff),u16(0)));
+    const all=[...chunks,...central,end];let tot=0;all.forEach(a=>tot+=a.length);const out=new Uint8Array(tot);let p=0;all.forEach(a=>{out.set(a,p);p+=a.length;});return new Blob([out],{type:"application/zip"});}
+  function dataURLtoU8(durl){const b64=durl.split(",")[1];const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+  $("exportZipBtn").addEventListener("click",()=>{if(!captures.length){setStatus("Ingen billeder at eksportere.");return;}
+    const rdy=captures.map(c=>new Promise(res=>{if(c.thumb)res();else makeThumb(c,u=>{c.thumb=u;res();});}));
+    Promise.all(rdy).then(()=>{const enc=new TextEncoder();const files=[];const sagName=(sbSag||"sag").replace(/[^\w\-]+/g,"_");
+      captures.forEach((c,i)=>{const nm=String(i+1).padStart(2,"0")+(c.caption?("_"+c.caption.replace(/[^\w\-]+/g,"_").slice(0,40)):"");files.push({name:sagName+"/billeder/"+nm+".jpg",data:dataURLtoU8(c.thumb||c.img)});});
+      files.push({name:sagName+"/rapport.html",data:enc.encode(buildReportHTML())});
+      const blob=makeZip(files);const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=sagName+".zip";a.click();
+      if(!isMobile&&hasFS&&dirHandle)writeToFolder(sagName+".zip",blob);
+      setStatus("Sag eksporteret som "+sagName+".zip ("+captures.length+" billeder + rapport).");});});
+
   $("camSelect").addEventListener("change",()=>{if(source==="live")startCamera($("camSelect").value);});
   // ☰ hovedmenu
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
@@ -656,12 +679,17 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
     }catch(e){$("auStatus").textContent="Fejl: "+(e.message||e);}}
   $("auCreate").addEventListener("click",createUser);
   async function renderOrgUsers(){if(!sb)return;try{
-    let q=sb.from("wg_profiles").select("email,role,org_id").order("email",{ascending:true});
+    let q=sb.from("wg_profiles").select("id,email,role,org_id").order("email",{ascending:true});
     if(!sbSuper&&sbOrg)q=q.eq("org_id",sbOrg);
     const{data}=await q;const orgName=id=>{const o=_orgs.find(x=>x.id===id);return o?o.name:"";};
     const list=$("auList");list.innerHTML="";(data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
-      const on=sbSuper&&u.org_id?(" · "+(orgName(u.org_id)||"")):"";
-      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}${on}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>`;list.appendChild(row);});}catch(e){}}
+      const on=sbSuper&&u.org_id?(" · "+(orgName(u.org_id)||"")):"";const me=sbUser&&u.id===sbUser.id;
+      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}${on}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>${me?"":`<button data-del-user="${u.id}" data-email="${u.email}" title="Slet bruger">✕</button>`}`;
+      const db=row.querySelector("[data-del-user]");if(db)db.addEventListener("click",()=>deleteUser(db.dataset.delUser,db.dataset.email));
+      list.appendChild(row);});}catch(e){}}
+  async function deleteUser(id,email){if(!confirm("Slet brugeren "+email+"? Dette kan ikke fortrydes."))return;
+    $("auStatus").textContent="Sletter…";const{ok,j}=await callAdmin({action:"delete_user",user_id:id});
+    if(!ok){$("auStatus").textContent="Fejl: "+(j.error||"");return;}$("auStatus").textContent="Slettet: "+email;renderOrgUsers();}
 
   if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
   updateAuthUI(); // vis login-felter med det samme, også før forbindelse
