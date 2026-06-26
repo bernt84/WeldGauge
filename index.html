@@ -337,10 +337,24 @@
     const ext=[...sel.options].find(o=>/usb|hd|netum|booth|document|cam|back|rear/i.test(o.textContent)&&!/front|face|truedepth/i.test(o.textContent));if(ext)sel.value=ext.value;}
   async function startCamera(deviceId){stopCamera();showErr(false);still.style.display="none";video.style.display="block";
     const wantRear=isMobile&&!deviceId;
-    try{stream=await navigator.mediaDevices.getUserMedia({video:{deviceId:deviceId?{exact:deviceId}:undefined,facingMode:deviceId?undefined:{ideal:"environment"},width:{ideal:3840},height:{ideal:2160}},audio:false});}
-    catch(e){try{stream=await navigator.mediaDevices.getUserMedia({video:wantRear?{facingMode:{ideal:"environment"}}:(deviceId?{deviceId:{exact:deviceId}}:true),audio:false});}catch(e2){showErr(true,e2.message||"Adgang nægtet");return;}}
+    // Forsøg højeste opløsning først, fald kun ned hvis enheden afviser
+    const res=[{width:{ideal:7680},height:{ideal:4320}},{width:{ideal:3840},height:{ideal:2160}},{width:{ideal:1920},height:{ideal:1080}},{}];
+    const tries=[];
+    res.forEach(r=>{
+      if(deviceId)tries.push({video:Object.assign({deviceId:{exact:deviceId}},r)});
+      else if(wantRear)tries.push({video:Object.assign({facingMode:{ideal:"environment"}},r)});
+      else tries.push({video:Object.assign({},r)});
+    });
+    tries.push({video:true});
+    let ok=false,lastErr=null;
+    for(const c of tries){try{stream=await navigator.mediaDevices.getUserMedia(Object.assign({audio:false},c));ok=true;break;}catch(e){lastErr=e;}}
+    if(!ok){showErr(true,(lastErr&&(lastErr.message||lastErr.name))||"Adgang nægtet");return;}
     if(deviceId){try{localStorage.setItem("mm_cam",deviceId);}catch(e){}}
-    video.srcObject=stream;track=stream.getVideoTracks()[0];await video.play().catch(()=>{});$("liveDot").classList.add("live");$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;requestWake();setupHwZoom();refreshCams();requestAnimationFrame(loop);setHint();}
+    video.srcObject=stream;track=stream.getVideoTracks()[0];
+    // bed om højeste opløsning kameraet kan, hvis tilgængeligt
+    try{const caps=track.getCapabilities?track.getCapabilities():null;if(caps&&caps.width&&caps.height){await track.applyConstraints({width:caps.width.max,height:caps.height.max});}}catch(e){}
+    await video.play().catch(()=>{});$("liveDot").classList.add("live");$("zoomWrap").style.display="flex";$("snapBtn").disabled=false;requestWake();setupHwZoom();refreshCams();requestAnimationFrame(loop);setHint();showRes();}
+  function showRes(){try{const s=track&&track.getSettings?track.getSettings():null;if(s&&s.width)setStatus("Kamera: "+s.width+"×"+s.height+" px");}catch(e){}}
   function setupHwZoom(){const w=$("hwZoomWrap");try{const c=track.getCapabilities?track.getCapabilities():{};if(c&&c.zoom&&c.zoom.max>c.zoom.min){const s=$("hwZoom");s.min=c.zoom.min;s.max=c.zoom.max;s.step=c.zoom.step||((c.zoom.max-c.zoom.min)/50);const cur=track.getSettings().zoom||c.zoom.min;s.value=cur;$("hwZoomVal").textContent=(+cur).toFixed(1)+"×";w.style.display="flex";s.oninput=async()=>{try{await track.applyConstraints({advanced:[{zoom:+s.value}]});$("hwZoomVal").textContent=(+s.value).toFixed(1)+"×";}catch(e){}};return;}}catch(e){}w.style.display="none";}
   async function refreshCams(){const cur=$("camSelect").value;const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="videoinput");if(devs.some(d=>d.label)){const sel=$("camSelect");sel.innerHTML="";devs.forEach((d,i)=>{const o=document.createElement("option");o.value=d.deviceId;o.textContent=d.label||("Kamera "+(i+1));sel.appendChild(o);});if(cur)sel.value=cur;}}
   function stopCamera(){if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;track=null;}$("liveDot").classList.remove("live");}
