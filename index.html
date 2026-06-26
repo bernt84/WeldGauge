@@ -28,6 +28,13 @@
   header .scale-badge{font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
   header .scale-badge b{color:var(--cyan)}
   .stage{position:relative;flex:1;min-height:0;background:#000;overflow:hidden}
+  #fsBtn{position:absolute;top:8px;right:8px;z-index:8;width:40px;height:40px;min-height:0;padding:0;border-radius:8px;background:rgba(13,17,23,.7);border:1px solid var(--line);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+  body.fs .stage{position:fixed;inset:0;z-index:50;flex:none}
+  body.fs .controls,body.fs header{display:none!important}
+  body.fs #fsBtn{top:calc(8px + env(safe-area-inset-top,0px))}
+  #fsBar{display:none}
+  body.fs #fsBar{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:55;gap:8px;background:rgba(13,17,23,.8);border:1px solid var(--line);border-radius:12px;padding:8px}
+  body.fs #fsBar button{min-height:0;padding:10px 16px;font-size:18px}
   video,img#still,canvas#overlay{position:absolute;inset:0;width:100%;height:100%}
   video,img#still{object-fit:contain;background:#000}img#still{display:none}
   canvas#overlay{touch-action:none}
@@ -104,10 +111,12 @@
 <div class="stage" id="stage">
   <video id="video" playsinline autoplay muted></video>
   <img id="still" alt=""><canvas id="overlay"></canvas>
+  <button id="fsBtn" title="Fuld skærm">⛶</button>
   <div class="editbar" id="editbar"><button class="primary" id="saveEditBtn">✓ Gem ændringer</button><button class="ghost" id="closeEditBtn">Luk</button></div>
   <div class="hint" id="hint">Vælg kilde nedenfor</div>
   <div class="readout" id="readout"></div>
   <div class="err" id="err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8.5l4-3v13l-4-3v-7zM6 5.5h11a2 2 0 012 2v9a2 2 0 01-2 2H6"/><line x1="3" y1="3" x2="21" y2="21" stroke-width="2"/></svg><div id="errMsg">Kunne ikke få adgang til kameraet.</div></div>
+  <div id="fsBar"><button class="ghost" id="fsFreeze">📷</button><button class="ghost" id="fsUndo">↶</button><button class="primary" id="fsSnap">💾</button></div>
 </div>
 
 <div class="controls" id="controls">
@@ -178,14 +187,14 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.4.2 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.5.0 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
   <div class="seg mode" id="modeSeg"><button data-mode="measure" class="active" data-i18n="measure">📏 Måling</button><button data-mode="assess" data-i18n="assess">✓ Vurdering</button></div>
 
   <div class="zoomwrap" id="hwZoomWrap" style="display:none"><label>Kamera-zoom</label><input type="range" id="hwZoom"><span id="hwZoomVal">–</span></div>
-  <div class="zoomwrap" id="zoomWrap" style="display:none"><label>Zoom</label><input type="range" id="zoom" min="1" max="5" step="0.1" value="1"><span id="zoomVal">1.0×</span></div>
+  <div class="zoomwrap" id="zoomWrap" style="display:none"><label>Zoom</label><input type="range" id="zoom" min="1" max="8" step="0.1" value="1"><span id="zoomVal">1.0×</span></div>
 
   <div class="seg" id="calSeg"><button data-cal="manual" class="active" data-i18n="calRuler">Lineal (2 punkter)</button><button data-cal="marker" data-i18n="calMarker">Kalibreringsmærke</button></div>
   <div class="row" id="calManualRow"><label>Kendt længde</label><input type="number" id="refLen" value="10" min="0.1" step="0.1"><select id="refUnit" style="flex:0 0 56px;min-width:0"><option value="1">mm</option><option value="10">cm</option></select><button class="primary" id="calBtn">Kalibrér</button></div>
@@ -331,7 +340,7 @@
   let source="live",stream=null,track=null,haveImage=false,frozen=false;
   let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
   let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,capTarget=null,lastAthroat=null,athroatDrag=false;
-  let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1;
+  let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1,panX=0,panY=0;
   let captures=[],editIndex=-1,prevState=null,markerCorners=null;
 
   function params(){return{L:$("level").value,wt:$("weldType").value,t:+$("tThk").value||0,nomA:+$("nomA").value||0,aA:+$("aARef").value||0,s:+$("sThk").value||0,b:+$("bWid").value||0,concave:$("concave").checked};}
@@ -404,6 +413,11 @@
     still.src=c.toDataURL("image/jpeg",.92);}
   function unfreeze(){frozen=false;still.style.display="none";video.style.display="block";still.src="";marks=[];placing=[];$("freezeBtn").textContent="📷 Tag billede";renderMarks();setHint();syncCanvas();draw();if(stream)requestAnimationFrame(loop);}
   $("freezeBtn").addEventListener("click",()=>{if(source!=="live")return;if(frozen)unfreeze();else freezeFrame();});
+  function toggleFs(on){const v=on===undefined?!document.body.classList.contains("fs"):on;document.body.classList.toggle("fs",v);$("fsBtn").textContent=v?"✕":"⛶";setTimeout(()=>{syncCanvas();draw();},60);}
+  $("fsBtn").addEventListener("click",()=>toggleFs());
+  $("fsFreeze").addEventListener("click",()=>{if(source==="live"){if(frozen)unfreeze();else freezeFrame();}});
+  $("fsUndo").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
+  $("fsSnap").addEventListener("click",()=>$("snapBtn").click());
   function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
 
   /* ============ KAMERA ============ */
@@ -446,7 +460,10 @@
   function useStill(){return source==="upload"||editIndex>=0||frozen;}
   function mediaSize(){if(useStill()&&still.naturalWidth)return{w:still.naturalWidth,h:still.naturalHeight};return{w:video.videoWidth,h:video.videoHeight};}
   function syncCanvas(){const r=stage.getBoundingClientRect();overlay.width=Math.round(r.width*dpr);overlay.height=Math.round(r.height*dpr);overlay.style.width=r.width+"px";overlay.style.height=r.height+"px";
-    const{w:vw,h:vh}=mediaSize();if(vw&&vh){const cw=overlay.width,ch=overlay.height;const sc=Math.min(cw/vw,ch/vh)*zoom;mr={x:(cw-vw*sc)/2,y:(ch-vh*sc)/2,w:vw*sc,h:vh*sc,sx:sc};const el=useStill()?still:video;el.style.transform=zoom>1?`scale(${zoom})`:"none";}}
+    const{w:vw,h:vh}=mediaSize();if(vw&&vh){const cw=overlay.width,ch=overlay.height;const sc=Math.min(cw/vw,ch/vh)*zoom;mr={x:(cw-vw*sc)/2+panX*dpr,y:(ch-vh*sc)/2+panY*dpr,w:vw*sc,h:vh*sc,sx:sc};const el=useStill()?still:video;el.style.transform=(zoom>1||panX||panY)?`translate(${panX}px,${panY}px) scale(${zoom})`:"none";el.style.transformOrigin="center center";}}
+  function clampPan(){if(!mr)return;const cw=overlay.width,ch=overlay.height;const ov=zoom>1;if(!ov){panX=0;panY=0;return;}
+    // begræns så billedet ikke trækkes helt ud af skærmen
+    const maxX=(mr.w-cw)/2/dpr+40,maxY=(mr.h-ch)/2/dpr+40;panX=Math.max(-Math.abs(maxX),Math.min(Math.abs(maxX),panX));panY=Math.max(-Math.abs(maxY),Math.min(Math.abs(maxY),panY));}
   function loop(){syncCanvas();draw();if(stream&&source==="live"&&editIndex<0&&!frozen)requestAnimationFrame(loop);}
   function v2c(p){return{x:mr.x+p.x*mr.sx,y:mr.y+p.y*mr.sx};}
   function c2v(cx,cy){return{x:(cx*dpr-mr.x)/mr.sx,y:(cy*dpr-mr.y)/mr.sx};}
@@ -505,7 +522,13 @@
   function ready(){return editIndex>=0||(source==="live"&&stream)||(source==="upload"&&haveImage)||frozen;}
   function getXY(e){const r=overlay.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
   function hitTest(cx,cy){const tol=18;for(let di=0;di<marks.length;di++){const arr=marks[di].pts;for(let i=0;i<arr.length;i++){const cp=v2c(arr[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr,idx:i,mark:marks[di]};}}for(let i=0;i<placing.length;i++){const cp=v2c(placing[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:placing,idx:i};}for(let i=0;i<calPts.length;i++){const cp=v2c(calPts[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:calPts,idx:i,cal:true};}return null;}
-  function down(e){if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
+  let pinch=null;
+  function touchDist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+  function touchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+  function down(e){
+    // to fingre = pinch-zoom / panorering
+    if(e.touches&&e.touches.length===2){e.preventDefault();drag=null;athroatDrag=false;pinch={d:touchDist(e.touches),z:zoom,mid:touchMid(e.touches),px:panX,py:panY};return;}
+    if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
     if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
     if(!mmPerPx){setStatus("Kalibrér først.");return;}
     if(capTarget){capTarget.pts.push(c2v(x,y));const t=capTarget;capTarget=null;$("capBtn").style.display="none";renderMarks();showResult(t);setHint();draw();return;}
@@ -517,9 +540,15 @@
       if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}
     }else{setHint();}draw();}
   function move(e){
+    if(pinch&&e.touches&&e.touches.length===2){e.preventDefault();const d=touchDist(e.touches);const mid=touchMid(e.touches);
+      zoom=Math.max(1,Math.min(8,pinch.z*(d/pinch.d)));
+      // panorér med to-finger-bevægelsen
+      panX=pinch.px+(mid.x-pinch.mid.x);panY=pinch.py+(mid.y-pinch.mid.y);
+      clampPan();$("zoom").value=Math.min(8,zoom);$("zoomVal").textContent=zoom.toFixed(1)+"×";syncCanvas();draw();return;}
     if(athroatDrag){e.preventDefault();const{x,y}=getXY(e);placing[4]=c2v(x,y);drawAthroatPreview();return;}
     if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
-  function up(){
+  function up(e){
+    if(pinch){if(!e.touches||e.touches.length<2)pinch=null;return;}
     if(athroatDrag){athroatDrag=false;const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};marks.push(m);placing=[];renderMarks();showResult(m);setHint();if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}draw();return;}
     drag=null;}
   // live-preview af a-stregen mens man trækker
@@ -710,7 +739,7 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
   $("menuBtn").addEventListener("click",()=>toggleMenu());
   $("menuBack").addEventListener("click",()=>toggleMenu(false));
-  $("zoom").addEventListener("input",e=>{zoom=+e.target.value;$("zoomVal").textContent=zoom.toFixed(1)+"×";if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
+  $("zoom").addEventListener("input",e=>{zoom=+e.target.value;if(zoom<=1){panX=0;panY=0;}$("zoomVal").textContent=zoom.toFixed(1)+"×";clampPan();syncCanvas();draw();});
   window.addEventListener("resize",()=>{dpr=Math.max(1,window.devicePixelRatio||1);if(source==="upload"||editIndex>=0){syncCanvas();draw();}});
 
   /* ============ SKY-SYNK + LOGIN (Supabase, virksomheds-model) ============ */
