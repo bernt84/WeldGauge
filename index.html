@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.5 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.6 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -747,26 +747,32 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
     if(sbUser)$("sbWho").innerHTML="Logget ind som <b>"+sbUser.email+"</b>"+(sbOrgName?" · "+sbOrgName:"")+(sbSuper?" (super-admin)":sbRole==="org_admin"?" (org-admin)":"")+(!sbOrg&&!sbSuper?' <span style="color:var(--red)">— ingen virksomhed tildelt</span>':"");
     if(!sbUser)fillAccts();
     if(canAdmin){renderOrgUsers();if(sbSuper)renderOrgs();}}
+  // Hjælper: fetch med hård timeout (uafhængig af biblioteket)
+  function fetchT(url,opts,ms){return Promise.race([fetch(url,opts),new Promise((_,r)=>setTimeout(()=>r(new Error("__TIMEOUT__")),ms||10000))]);}
+  let sbToken=null;
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
-    if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet.");return;}}
+    if(!SB_READY){sbStatus("Projekt-credentials mangler i koden.");return;}
     sbStatus("Logger ind… (kontakter server)");
-    // Hård timeout der ALTID fyrer, uafhængigt af om fetch/AbortController hænger på iOS
-    const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("__TIMEOUT__")),10000));
-    const doFetch=fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw})});
     let res;
-    try{res=await Promise.race([doFetch,timeout]);}
-    catch(e){
-      if(e&&e.message==="__TIMEOUT__"){sbStatus("⏱ Timeout efter 10s — serveren svarer ikke. Netværket (firewall/APN) blokerer sandsynligvis supabase.co. Prøv et andet netværk/WiFi.");}
-      else{sbStatus("🚫 Netværksfejl: "+(e&&(e.message||e.name)||e)+" — kan ikke nå serveren.");}
-      return;
-    }
+    try{res=await fetchT(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw})},10000);}
+    catch(e){sbStatus(e&&e.message==="__TIMEOUT__"?"⏱ Timeout efter 10s — serveren svarer ikke. Netværket blokerer sandsynligvis supabase.co. Prøv andet net/WiFi.":"🚫 Netværksfejl: "+(e&&(e.message||e.name)||e));return;}
+    let txt="",j={};try{txt=await res.text();j=JSON.parse(txt);}catch(e){}
+    if(!res.ok){sbStatus("Login afvist (HTTP "+res.status+"): "+(j.error_description||j.msg||j.error||txt.slice(0,80)));return;}
+    sbToken=j.access_token;sbUser=j.user||null;
+    // Init biblioteks-klient i baggrunden (til realtime/sync) — men login afhænger IKKE af den
+    try{if(!sb&&typeof supabase!=="undefined"&&supabase.createClient){sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage,storageKey:"wg_session"}});}
+      if(sb)sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token}).catch(()=>{});}catch(e){}
+    // Hent profil via direkte REST (med timeout) — ikke via biblioteket
+    sbStatus("Henter profil…");
     try{
-      const txt=await res.text();let j={};try{j=JSON.parse(txt);}catch(e){}
-      if(!res.ok){sbStatus("Login afvist (HTTP "+res.status+"): "+(j.error_description||j.msg||j.error||txt.slice(0,80)));return;}
-      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}
-      try{const{data}=await sb.auth.getSession();await applySession(data.session||{user:j.user});}catch(e){await applySession({user:j.user});}
-      $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind ✓",true);
-    }catch(e){sbStatus("Uventet fejl efter svar: "+(e&&(e.message||e.name)||e));console.error("WeldGauge login:",e);}}
+      const pr=await fetchT(SB_URL+"/rest/v1/wg_profiles?id=eq."+sbUser.id+"&select=org_id,role,is_superadmin",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},10000);
+      const pa=await pr.json().catch(()=>[]);const p=Array.isArray(pa)?pa[0]:null;
+      sbOrg=p?p.org_id:null;sbRole=(p&&p.role)||"member";sbSuper=!!(p&&p.is_superadmin);
+      if(sbOrg){const or=await fetchT(SB_URL+"/rest/v1/wg_organizations?id=eq."+sbOrg+"&select=name",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},8000);const oa=await or.json().catch(()=>[]);sbOrgName=(oa[0]&&oa[0].name)||"";}
+    }catch(e){sbOrg=null;sbRole="member";sbSuper=false;}
+    rememberEmail(em);$("sbPass").value="";
+    updateAuthUI();setSyncPill();if(sbUser&&sbOrg)loadSager();sbStatus("Logget ind ✓",true);
+  }
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
