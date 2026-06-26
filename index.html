@@ -178,7 +178,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.4.1 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.4.2 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -482,8 +482,8 @@
     const r=evalMark(m);const col=colorFor(def,r.ok);
     if(def.mt==="athroat"){if(p.length>=2)rawline(p[0],p[1],"#39c5cf");if(p.length>=4)rawline(p[2],p[3],"#39c5cf");
       if(p.length>=5&&r.root&&r.S){const root=v2c(r.root),S=v2c(r.S);
-        const dx=S.x-root.x,dy=S.y-root.y,L=Math.hypot(dx,dy)||1;const ux=dx/L,uy=dy/L;const ext=Math.max(overlay.width,overlay.height);
-        ctx.strokeStyle="rgba(255,209,102,.7)";ctx.lineWidth=1.5*dpr;ctx.setLineDash([10*dpr,8*dpr]);ctx.beginPath();ctx.moveTo(root.x-ux*ext,root.y-uy*ext);ctx.lineTo(root.x+ux*ext,root.y+uy*ext);ctx.stroke();ctx.setLineDash([]);
+        const dx=S.x-root.x,dy=S.y-root.y,L=Math.hypot(dx,dy)||1;const ux=dx/L,uy=dy/L;const px=-uy,py=ux;const ext=Math.max(overlay.width,overlay.height);
+        ctx.strokeStyle="rgba(255,209,102,.7)";ctx.lineWidth=1.5*dpr;ctx.setLineDash([10*dpr,8*dpr]);ctx.beginPath();ctx.moveTo(S.x-px*ext,S.y-py*ext);ctx.lineTo(S.x+px*ext,S.y+py*ext);ctx.stroke();ctx.setLineDash([]);
         ctx.strokeStyle=col;ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(root.x,root.y);ctx.lineTo(S.x,S.y);ctx.stroke();
         handle(root,"#a371f7");label(S,tag(num,r),col);
         if(p.length>=6&&p[5]&&r.dir){const cp=v2c(p[5]);ctx.strokeStyle="#ff7b72";ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(S.x,S.y);ctx.lineTo(cp.x,cp.y);ctx.stroke();ctx.setLineDash([]);handle(cp,"#ff7b72");}}
@@ -525,9 +525,9 @@
   // live-preview af a-stregen mens man trækker
   function drawAthroatPreview(){draw();if(placing.length<5)return;const root=lineIntersect(placing[0],placing[1],placing[2],placing[3])||{x:(placing[1].x+placing[3].x)/2,y:(placing[1].y+placing[3].y)/2};
     const S=placing[4];const a=dist(root,S)*mmPerPx;const rc=v2c(root),sc=v2c(S);
-    // lang hjælpelinje (hypotenusen) gennem rod og trækpunkt, så man kan se den rammer
-    const dx=sc.x-rc.x,dy=sc.y-rc.y,L=Math.hypot(dx,dy)||1;const ux=dx/L,uy=dy/L;const ext=Math.max(overlay.width,overlay.height);
-    ctx.strokeStyle="rgba(255,209,102,.85)";ctx.lineWidth=1.5*dpr;ctx.setLineDash([10*dpr,8*dpr]);ctx.beginPath();ctx.moveTo(rc.x-ux*ext,rc.y-uy*ext);ctx.lineTo(rc.x+ux*ext,rc.y+uy*ext);ctx.stroke();ctx.setLineDash([]);
+    // hjælpelinje = sømfladen, vinkelret på a-stregen, gennem a-toppen (90° drejet)
+    const dx=sc.x-rc.x,dy=sc.y-rc.y,L=Math.hypot(dx,dy)||1;const ux=dx/L,uy=dy/L;const px=-uy,py=ux;const ext=Math.max(overlay.width,overlay.height);
+    ctx.strokeStyle="rgba(255,209,102,.85)";ctx.lineWidth=1.5*dpr;ctx.setLineDash([10*dpr,8*dpr]);ctx.beginPath();ctx.moveTo(sc.x-px*ext,sc.y-py*ext);ctx.lineTo(sc.x+px*ext,sc.y+py*ext);ctx.stroke();ctx.setLineDash([]);
     // selve a-stregen (rod -> trækpunkt)
     ctx.strokeStyle=cvv("--violet");ctx.lineWidth=3*dpr;ctx.beginPath();ctx.moveTo(rc.x,rc.y);ctx.lineTo(sc.x,sc.y);ctx.stroke();
     handle(rc,"#a371f7");handle(sc,cvv("--violet"));label(sc,"a="+fmt(a)+" mm",cvv("--violet"));}
