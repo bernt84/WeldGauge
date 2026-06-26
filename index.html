@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.7 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.8 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -418,11 +418,11 @@
     const res=[{width:{ideal:7680},height:{ideal:4320}},{width:{ideal:3840},height:{ideal:2160}},{width:{ideal:1920},height:{ideal:1080}},{}];
     const tries=[];
     res.forEach(r=>{
-      if(useFacing)tries.push({video:Object.assign({facingMode:{exact:face}},r)});
+      if(useFacing){tries.push({video:Object.assign({facingMode:{exact:face}},r)});tries.push({video:Object.assign({facingMode:{ideal:face}},r)});}
       else if(deviceId)tries.push({video:Object.assign({deviceId:{exact:deviceId}},r)});
       else tries.push({video:Object.assign({},r)});
     });
-    if(useFacing)tries.push({video:{facingMode:face}});
+    if(useFacing){tries.push({video:{facingMode:{ideal:face}}});tries.push({video:{facingMode:face}});}
     tries.push({video:true});
     let ok=false,lastErr=null;
     setStatus("Starter kamera…");
@@ -705,7 +705,8 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
       setStatus("Sag eksporteret som "+sagName+".zip ("+captures.length+" billeder + rapport).");});});
 
   $("camSelect").addEventListener("change",()=>{try{localStorage.setItem("mm_cam",$("camSelect").value);}catch(e){}if(source==="live")startCamera($("camSelect").value);});
-  document.querySelectorAll("#facingSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#facingSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");facing=b.dataset.face;if(source==="live")startCamera(null,facing);}));
+  document.querySelectorAll("#facingSeg button").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("#facingSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");facing=b.dataset.face;if(source==="live"){await startCamera(null,facing);
+    try{const s=track&&track.getSettings?track.getSettings():null;if(s&&s.facingMode&&s.facingMode!==facing)setStatus("⚠ Kunne ikke skifte til "+(facing==="user"?"forkamera":"bagkamera")+" — enheden gav "+(s.facingMode==="user"?"forkamera":"bagkamera")+".");}catch(e){}}}));
   // ☰ hovedmenu
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
   $("menuBtn").addEventListener("click",()=>toggleMenu());
@@ -751,6 +752,27 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   // Hjælper: fetch med hård timeout (uafhængig af biblioteket)
   function fetchT(url,opts,ms){return Promise.race([fetch(url,opts),new Promise((_,r)=>setTimeout(()=>r(new Error("__TIMEOUT__")),ms||10000))]);}
   let sbToken=null;
+  async function loadProfile(){try{
+    const pr=await fetchT(SB_URL+"/rest/v1/wg_profiles?id=eq."+sbUser.id+"&select=org_id,role,is_superadmin",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},10000);
+    const pa=await pr.json().catch(()=>[]);const p=Array.isArray(pa)?pa[0]:null;
+    sbOrg=p?p.org_id:null;sbRole=(p&&p.role)||"member";sbSuper=!!(p&&p.is_superadmin);
+    if(sbOrg){const or=await fetchT(SB_URL+"/rest/v1/wg_organizations?id=eq."+sbOrg+"&select=name",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},8000);const oa=await or.json().catch(()=>[]);sbOrgName=(oa[0]&&oa[0].name)||"";}
+  }catch(e){sbOrg=null;sbRole="member";sbSuper=false;}}
+  async function restoreSession(){
+    let s=null;try{s=JSON.parse(localStorage.getItem("wg_sess")||"null");}catch(e){}
+    if(!s||!s.refresh_token)return;
+    sbStatus("Gendanner login…");
+    // forny token (access-token udløber efter ~1 time)
+    try{
+      const r=await fetchT(SB_URL+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({refresh_token:s.refresh_token})},10000);
+      const j=await r.json().catch(()=>({}));
+      if(r.ok&&j.access_token){sbToken=j.access_token;sbUser=j.user||s.user;
+        try{localStorage.setItem("wg_sess",JSON.stringify({access_token:j.access_token,refresh_token:j.refresh_token,user:sbUser,ts:Date.now()}));}catch(e){}
+        try{if(!sb&&typeof supabase!=="undefined"&&supabase.createClient){sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage,storageKey:"wg_session"}});}if(sb)sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token}).catch(()=>{});}catch(e){}
+        await loadProfile();updateAuthUI();setSyncPill();if(sbUser&&sbOrg)loadSager();sbStatus("Logget ind ✓",true);
+      }else{localStorage.removeItem("wg_sess");}
+    }catch(e){/* offline: behold gemt session til næste gang */}
+  }
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
     if(!SB_READY){sbStatus("Projekt-credentials mangler i koden.");return;}
     sbStatus("Logger ind… (kontakter server)");
@@ -760,23 +782,18 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
     let txt="",j={};try{txt=await res.text();j=JSON.parse(txt);}catch(e){}
     if(!res.ok){sbStatus("Login afvist (HTTP "+res.status+"): "+(j.error_description||j.msg||j.error||txt.slice(0,80)));return;}
     sbToken=j.access_token;sbUser=j.user||null;
-    // Init biblioteks-klient i baggrunden (til realtime/sync) — men login afhænger IKKE af den
+    // Gem session lokalt så man forbliver logget ind efter genåbning
+    try{localStorage.setItem("wg_sess",JSON.stringify({access_token:j.access_token,refresh_token:j.refresh_token,user:j.user,ts:Date.now()}));}catch(e){}
     try{if(!sb&&typeof supabase!=="undefined"&&supabase.createClient){sb=supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage,storageKey:"wg_session"}});}
       if(sb)sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token}).catch(()=>{});}catch(e){}
-    // Hent profil via direkte REST (med timeout) — ikke via biblioteket
     sbStatus("Henter profil…");
-    try{
-      const pr=await fetchT(SB_URL+"/rest/v1/wg_profiles?id=eq."+sbUser.id+"&select=org_id,role,is_superadmin",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},10000);
-      const pa=await pr.json().catch(()=>[]);const p=Array.isArray(pa)?pa[0]:null;
-      sbOrg=p?p.org_id:null;sbRole=(p&&p.role)||"member";sbSuper=!!(p&&p.is_superadmin);
-      if(sbOrg){const or=await fetchT(SB_URL+"/rest/v1/wg_organizations?id=eq."+sbOrg+"&select=name",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+sbToken}},8000);const oa=await or.json().catch(()=>[]);sbOrgName=(oa[0]&&oa[0].name)||"";}
-    }catch(e){sbOrg=null;sbRole="member";sbSuper=false;}
+    await loadProfile();
     rememberEmail(em);$("sbPass").value="";
     updateAuthUI();setSyncPill();if(sbUser&&sbOrg)loadSager();sbStatus("Logget ind ✓",true);
   }
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
-  async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
+  async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{if(sb)await sb.auth.signOut();}catch(e){}try{localStorage.removeItem("wg_sess");}catch(e){}sbToken=null;sbUser=null;sbOrg=null;sbRole="member";sbSuper=false;captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;updateAuthUI();sbStatus("Logget ud.");setSyncPill();}
   $("sbLogout").addEventListener("click",sbLogout);
 
   function canSee(row){return sbOrg&&row.org_id===sbOrg;}
@@ -872,7 +889,7 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
   updateAuthUI(); // vis login-felter med det samme, også før forbindelse
   // hvis login-biblioteket loader sent (langsomt net), så forbind når det er klar
-  bindSagUI();if(SB_READY && !sb){let tries=0;const t=setInterval(()=>{tries++;if(typeof supabase!=="undefined"&&supabase.createClient){clearInterval(t);sbInitClient();}else if(tries>40)clearInterval(t);},500);}
+  bindSagUI();if(SB_READY)restoreSession();
   setSyncPill();
 
   /* ============ INIT ============ */
