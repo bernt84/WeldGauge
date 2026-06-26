@@ -90,6 +90,23 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // ---- Skift rolle ----
+    if (action === "set_role") {
+      const targetId = body.user_id;
+      const role = body.role === "org_admin" ? "org_admin" : "member";
+      if (!targetId) return json({ error: "Mangler bruger-id" }, 400);
+      const { data: target } = await admin.from("wg_profiles").select("org_id, is_superadmin").eq("id", targetId).single();
+      if (!target) return json({ error: "Bruger ikke fundet" }, 404);
+      if (target.is_superadmin && !isSuper) return json({ error: "Ingen rettigheder" }, 403);
+      if (!isSuper) {
+        if (!isOrgAdmin) return json({ error: "Ingen rettigheder" }, 403);
+        if (target.org_id !== prof.org_id) return json({ error: "Bruger tilhører en anden virksomhed" }, 403);
+      }
+      const { error } = await admin.from("wg_profiles").update({ role }).eq("id", targetId);
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
+    }
+
     return json({ error: "Ukendt handling" }, 400);
   } catch (e) {
     return json({ error: String(e) }, 500);
