@@ -70,6 +70,26 @@ Deno.serve(async (req) => {
       return json({ ok: true, id: created.user.id, email });
     }
 
+    // ---- Slet bruger ----
+    if (action === "delete_user") {
+      const targetId = body.user_id;
+      if (!targetId) return json({ error: "Mangler bruger-id" }, 400);
+      if (targetId === caller.user.id) return json({ error: "Du kan ikke slette dig selv" }, 400);
+      // Find målprofilen
+      const { data: target } = await admin.from("wg_profiles").select("org_id, is_superadmin").eq("id", targetId).single();
+      if (!target) return json({ error: "Bruger ikke fundet" }, 404);
+      if (target.is_superadmin && !isSuper) return json({ error: "Ingen rettigheder" }, 403);
+      // Org-admin må kun slette i egen virksomhed
+      if (!isSuper) {
+        if (!isOrgAdmin) return json({ error: "Ingen rettigheder" }, 403);
+        if (target.org_id !== prof.org_id) return json({ error: "Bruger tilhører en anden virksomhed" }, 403);
+      }
+      await admin.from("wg_profiles").delete().eq("id", targetId);
+      const { error: derr } = await admin.auth.admin.deleteUser(targetId);
+      if (derr) return json({ error: derr.message }, 400);
+      return json({ ok: true });
+    }
+
     return json({ error: "Ukendt handling" }, 400);
   } catch (e) {
     return json({ error: String(e) }, 500);
