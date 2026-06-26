@@ -144,6 +144,9 @@
       <div id="sessRow" style="display:none">
         <div class="row"><span class="store-pill" id="sbWho" style="flex:1"></span><button class="ghost" id="sbLogout" style="flex:0 0 auto">Log ud</button></div>
         <div class="row"><label>Sag-id</label><input type="text" id="sbSag" placeholder="fx ordre-1234"><button class="primary" id="sbConnect" style="flex:0 0 auto">Forbind</button></div>
+        <div class="row"><input type="text" id="sbDesc" placeholder="Sagsbeskrivelse (valgfri)" style="flex:1"><button class="ghost" id="sbDescSave" style="flex:0 0 auto">Gem</button></div>
+        <div class="row"><input type="text" id="sagSearch" placeholder="🔎 Søg i sager" style="flex:1"></div>
+        <div class="dlist" id="sagList"></div>
       </div>
       <div class="store-pill" id="sbStatus">Ikke logget ind — lokal måling fungerer uden login.</div>
       <div class="note">Log ind med din WeldGauge-konto. <b>Alle i samme virksomhed deler sager og billeder</b>; andre virksomheder ser intet. Login kræver internet.</div>
@@ -231,6 +234,7 @@
     m_leg:{name:"Benlængde (z)",kind:"measure",grp:"measure",n:2,mt:"len",eval:v=>({val:v.mm,disp:"z="+fmt(v.mm)+" mm",ok:null})},
     m_angle:{name:"Vinkel",kind:"measure",grp:"measure",n:3,mt:"ang",eval:v=>({val:v.deg,disp:v.deg.toFixed(1)+"°",ok:null})},
     m_p2l:{name:"Punkt → linje",kind:"measure",grp:"measure",n:3,mt:"p2l",eval:v=>({val:v.d,disp:"d⊥="+fmt(v.d)+" mm",ok:null})},
+    m_note:{name:"📝 Tekst / note",kind:"note",grp:"measure",n:1,mt:"note",eval:v=>({val:0,disp:"",ok:null})},
     amaal:{name:"a-mål (5213/5214)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>evalA(v.mm,P)},
     zlegs:{name:"a-mål via z-ben",kind:"assess",grp:"surface",n:4,mt:"zlegs",concave:true,eval:(v,P)=>{if(P.concave)return{val:null,disp:"konkav — mål a direkte",ok:null,allowTxt:"estimat ugyldigt"};const a=0.7071*Math.min(v.z1,v.z2);return evalA(a,P,true);}},
     pore_s:{name:"Overfladepore (2017)",kind:"assess",grp:"surface",n:2,mt:"len",eval:(v,P)=>{const ref=P.wt==="fillet"?P.aA:P.s;let allow;if(P.t<=3)allow=pick(P.L,{D:0.3*ref,C:null,B:null});else allow=pick(P.L,{D:Math.min(0.3*ref,3),C:Math.min(0.2*ref,2),B:null});return verd(v.mm,allow,P.L,"d ≤ ");}},
@@ -290,10 +294,11 @@
   $("folderBtn").addEventListener("click",chooseFolder);
 
   // record = minimal persistent form
-  function toRecord(cap){return{id:cap.id,created:cap.created||Date.now(),keep:!!cap.keep,img:cap.img,W:cap.W,H:cap.H,mmPerPx:cap.mmPerPx,calPts:cap.calPts,marks:cap.marks,params:cap.params};}
+  function toRecord(cap){return{id:cap.id,created:cap.created||Date.now(),keep:!!cap.keep,caption:cap.caption||"",img:cap.img,W:cap.W,H:cap.H,mmPerPx:cap.mmPerPx,calPts:cap.calPts,marks:cap.marks,params:cap.params};}
   function fromRecord(rec){const results=rec.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,rec.marks.length,m.pts,rec.mmPerPx),rec.params));
-    return{id:rec.id,created:rec.created||Date.now(),keep:!!rec.keep,img:rec.img,W:rec.W,H:rec.H,mmPerPx:rec.mmPerPx,calPts:rec.calPts,marks:rec.marks,params:rec.params,results,thumb:null};}
+    return{id:rec.id,created:rec.created||Date.now(),keep:!!rec.keep,caption:rec.caption||"",img:rec.img,W:rec.W,H:rec.H,mmPerPx:rec.mmPerPx,calPts:rec.calPts,marks:rec.marks,params:rec.params,results,thumb:null};}
   function valsForPts(type,_n,pts,scale){const mt=DEF[type].mt;
+    if(mt==="note")return{};
     if(mt==="ang"){const[a,b,c]=pts;const v1={x:a.x-b.x,y:a.y-b.y},v2={x:c.x-b.x,y:c.y-b.y};const dd=(v1.x*v2.x+v1.y*v2.y)/(Math.hypot(v1.x,v1.y)*Math.hypot(v2.x,v2.y));return{deg:Math.acos(Math.max(-1,Math.min(1,dd)))*180/Math.PI};}
     if(mt==="p2l")return{d:perp(pts[2],pts[0],pts[1])*scale};
     if(mt==="zlegs"||mt==="diff")return{z1:dist(pts[0],pts[1])*scale,z2:dist(pts[2],pts[3])*scale};
@@ -355,7 +360,9 @@
       else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
       else if(placing.length>=2)rawline(placing[0],placing[1],col);
       placing.forEach(p=>handle(v2c(p),col));}}
-  function drawMark(m,num){const r=evalMark(m);const def=DEF[m.type];const col=colorFor(def,r.ok);const p=m.pts;
+  function drawMark(m,num){const def=DEF[m.type];const p=m.pts;
+    if(def.mt==="note"){const col="#ffd166";const c=v2c(p[0]);label(c,(num+". "+(m.text||"(tom)")),col);handle(c,col);return;}
+    const r=evalMark(m);const col=colorFor(def,r.ok);
     if(def.mt==="p2l"){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);const a=v2c(p[2]),b=v2c(f);ctx.strokeStyle=col;ctx.lineWidth=2*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);label(v2c(p[2]),tag(num,r),col);}}
     else if(def.n===3){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=3){rawline(p[1],p[2],col);label(v2c(p[1]),tag(num,r),col);}}
     else if(def.n===4){if(p.length>=2)rawline(p[0],p[1],col);if(p.length>=4){rawline(p[2],p[3],col);label(v2c(p[0]),tag(num,r),col);}}
@@ -376,16 +383,21 @@
   function down(e){if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
     if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
     if(!mmPerPx){setStatus("Kalibrér først.");return;}
-    placing.push(c2v(x,y));if(placing.length===DEF[fault].n){const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};marks.push(m);placing=[];renderMarks();showResult(m);}draw();}
+    placing.push(c2v(x,y));if(placing.length===DEF[fault].n){const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};
+      if(DEF[fault].mt==="note"){const t=prompt("Skriv tekst til billedet:","");if(t===null){placing=[];draw();return;}m.text=t;}
+      marks.push(m);placing=[];renderMarks();showResult(m);}draw();}
   function move(e){if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
   function up(){drag=null;}
   overlay.addEventListener("mousedown",down);overlay.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
   overlay.addEventListener("touchstart",down,{passive:false});overlay.addEventListener("touchmove",move,{passive:false});window.addEventListener("touchend",up);
-  function showResult(m){const r=evalMark(m);const ro=$("readout");const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+DEF[m.type].name+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
+  function showResult(m){const ro=$("readout");if(DEF[m.type].mt==="note"){ro.innerHTML='<span class="big">📝 '+(m.text||"(tom)")+'</span>';ro.classList.add("show");return;}const r=evalMark(m);const vd=r.ok===true?'<span class="verdict ok">OK</span>':r.ok===false?'<span class="verdict no">AFVIST</span>':'';ro.innerHTML=`<span class="big">${r.disp}</span> ${vd} ${r.allowTxt?'<br><small>'+DEF[m.type].name+' · '+r.allowTxt+'</small>':''}`;ro.classList.add("show");}
   function renderMarks(){const card=$("defectsCard"),list=$("dlist");card.style.display=marks.length?"flex":"none";$("defCount").textContent=marks.length?("("+marks.length+")"):"";$("undoBtn").disabled=!(marks.length||placing.length);list.innerHTML="";
-    marks.forEach((m,i)=>{const r=evalMark(m);const dot=m.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const row=document.createElement("div");row.className="ditem";
-      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${i+1}. ${DEF[m.type].name}</span><span class="vl">${r.disp}</span><button data-i="${i}">✕</button>`;
-      row.querySelector("button").addEventListener("click",()=>{marks.splice(i,1);renderMarks();draw();});list.appendChild(row);});}
+    marks.forEach((m,i)=>{const isNote=DEF[m.type].mt==="note";const r=isNote?{disp:""}:evalMark(m);const dot=isNote?"#ffd166":m.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const row=document.createElement("div");row.className="ditem";
+      const valTxt=isNote?("“"+(m.text||"")+"”"):r.disp;
+      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${i+1}. ${isNote?"Tekst":DEF[m.type].name}</span><span class="vl">${valTxt}</span>${isNote?`<button data-edit="${i}">✎</button>`:""}<button data-del="${i}">✕</button>`;
+      row.querySelector("[data-del]").addEventListener("click",()=>{marks.splice(i,1);renderMarks();draw();});
+      const eb=row.querySelector("[data-edit]");if(eb)eb.addEventListener("click",()=>{const t=prompt("Rediger tekst:",m.text||"");if(t!==null){m.text=t;renderMarks();draw();}});
+      list.appendChild(row);});}
 
   /* ============ KALIBRERING ============ */
   document.querySelectorAll("#calSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#calSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");calMode=b.dataset.cal;$("calManualRow").style.display=calMode==="manual"?"flex":"none";$("calMarkerRow").style.display=calMode==="marker"?"flex":"none";}));
@@ -419,14 +431,16 @@
   function rawDataURL(){const{w:W,h:H}=mediaSize();const c=document.createElement("canvas");c.width=W;c.height=H;c.getContext("2d").drawImage((source==="upload"||editIndex>=0)?still:video,0,0,W,H);return{url:c.toDataURL("image/jpeg",.85),W,H};}
   function annotate(g,cap){const lw=Math.max(3,cap.W/700);const ln=(P,Q,col)=>{g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([]);g.beginPath();g.moveTo(P.x,P.y);g.lineTo(Q.x,Q.y);g.stroke();[P,Q].forEach(pt=>{g.beginPath();g.arc(pt.x,pt.y,lw*2,0,7);g.fillStyle=col;g.fill();});};
     if(cap.calPts&&cap.calPts.length===2)ln(cap.calPts[0],cap.calPts[1],"#2ea043");g.font="bold "+Math.max(20,cap.W/50)+"px Segoe UI, sans-serif";g.textAlign="left";
-    cap.marks.forEach((m,i)=>{const r=cap.results[i];const def=DEF[m.type];const col=def.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";const p=m.pts;
+    cap.marks.forEach((m,i)=>{const def=DEF[m.type];const p=m.pts;
+      if(def.mt==="note"){const col="#ffd166";const a=p[0];const t=(i+1)+". "+(m.text||"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);g.beginPath();g.arc(a.x,a.y,lw*2,0,7);g.fill();return;}
+      const r=cap.results[i];const col=def.kind==="measure"?"#39c5cf":r.ok===true?"#2ea043":r.ok===false?"#f85149":"#ffb000";
       if(def.mt==="p2l"){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3){const f=foot(p[2],p[0],p[1]);g.strokeStyle=col;g.lineWidth=lw;g.setLineDash([lw*2,lw*2]);g.beginPath();g.moveTo(p[2].x,p[2].y);g.lineTo(f.x,f.y);g.stroke();g.setLineDash([]);}}
       else if(def.n===3){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3)ln(p[1],p[2],col);}
       else if(def.n===4){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=4)ln(p[2],p[3],col);}
       else ln(p[0],p[1],col);
       const a=p[0];const t=(i+1)+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);});}
   function makeThumb(cap,cb){const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=cap.W;c.height=cap.H;const g=c.getContext("2d");g.drawImage(im,0,0);annotate(g,cap);cb(c.toDataURL("image/jpeg",.8));};im.src=cap.img;}
-  function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),created:Date.now(),keep:false,img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
+  function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y})),text:m.text}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),created:Date.now(),keep:false,caption:"",img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
 
   async function persistCapture(cap){
     if(isMobile){idbPut(toRecord(cap));}
@@ -444,18 +458,24 @@
     if(c.expired||days<=0)return '<div class="tlabel" style="color:#f85149">⚠ Udløbet — gem nu</div>';
     const col=days<=3?'#ffb000':'#2ea043';
     return '<div class="tlabel" style="color:'+col+'">⏳ '+days+' dg · '+c.marks.length+' mark.</div>';}
-  function renderGallery(){const g=$("gallery"),t=$("thumbs");g.classList.toggle("show",captures.length>0);$("reportCard").style.display=captures.length>0?"flex":"none";$("galCount").textContent=captures.length;t.innerHTML="";
+  function renderGallery(){const g=$("gallery"),t=$("thumbs");g.classList.toggle("show",captures.length>0);$("reportCard").style.display=captures.length>0?"flex":"none";
+    const soon=captures.filter(c=>!c.keep&&c.created&&(c.created+LIFETIME_MS-Date.now())<7*864e5).length;
+    $("galCount").innerHTML=captures.length+(soon?(' · <span style="color:#ffb000">⚠ '+soon+' udløber snart</span>'):'');
+    t.innerHTML="";
     captures.forEach((cap,i)=>{const fail=cap.results.some(r=>r.ok===false);const hasV=cap.results.some(r=>r.ok!=null);const dot=hasV?(fail?'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#f85149"></span>':'<span style="position:absolute;top:3px;left:3px;width:8px;height:8px;border-radius:50%;background:#2ea043"></span>'):'';
       const d=document.createElement("div");d.className="thumb";if(cap.expired)d.style.outline="2px solid #f85149";
+      const capTxt=cap.caption?('<div class="tlabel" style="bottom:18px;color:#cbd5e1">'+cap.caption+'</div>'):'';
       d.innerHTML=`<img src="${cap.thumb||cap.img}">`+
         `<button class="tx" data-del="${i}" title="Slet">✕</button>`+
         `<button class="tx" data-save="${i}" style="right:24px;background:rgba(57,197,207,.85)" title="Gem på enheden">⤓</button>`+
         `<button class="tx" data-keep="${i}" style="right:46px;background:${cap.keep?'rgba(163,113,247,.95)':'rgba(13,17,23,.7)'}" title="Behold (ingen auto-sletning)">📌</button>`+
-        `${dot}${expiryBadge(cap)}`;
+        `<button class="tx" data-cap="${i}" style="left:2px;right:auto;background:rgba(13,17,23,.7)" title="Billedtekst">✎</button>`+
+        `${dot}${capTxt}${expiryBadge(cap)}`;
       d.querySelector("img").addEventListener("click",()=>openEditor(i));
       d.querySelector("[data-del]").addEventListener("click",ev=>{ev.stopPropagation();const idx=+ev.currentTarget.dataset.del;const c=captures[idx];captures.splice(idx,1);if(isMobile)idbDel(c.id);purgeCloud(c);knownIds.delete(c.id);renderGallery();});
       d.querySelector("[data-save]").addEventListener("click",ev=>{ev.stopPropagation();saveOne(captures[+ev.currentTarget.dataset.save],+ev.currentTarget.dataset.save);});
       d.querySelector("[data-keep]").addEventListener("click",ev=>{ev.stopPropagation();keepOne(captures[+ev.currentTarget.dataset.keep]);});
+      d.querySelector("[data-cap]").addEventListener("click",ev=>{ev.stopPropagation();const c=captures[+ev.currentTarget.dataset.cap];const t=prompt("Billedtekst:",c.caption||"");if(t!==null){c.caption=t;if(isMobile)idbPut(toRecord(c));if(sb&&sbSag)sb.from("wg_maalinger").update({caption:t}).eq("id",c.id).then(()=>{});renderGallery();}});
       t.appendChild(d);});}
 
   // gem ét billede på enheden (download; på PC også til valgt mappe)
@@ -480,9 +500,9 @@
 
   /* ============ ÅBN / REDIGÉR ============ */
   function openEditor(i){const cap=captures[i];editIndex=i;prevState={source,zoom,calPts,marks,mmPerPx,fault,mode,ctxMode};if(stream)stopCamera();
-    still.onload=()=>{still.style.display="block";video.style.display="none";mmPerPx=cap.mmPerPx;calPts=cap.calPts.map(p=>({x:p.x,y:p.y}));marks=cap.marks.map(m=>({type:m.type,kind:m.kind||DEF[m.type].kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));markerCorners=null;zoom=1;$("zoom").value=1;$("zoomVal").textContent="1.0×";placing=[];applyParams(cap.params);if(mmPerPx)showScale();$("editbar").classList.add("show");$("snapBtn").disabled=true;setStatus("Redigerer — træk i punkterne. Tryk Gem ændringer.");renderMarks();syncCanvas();draw();};still.src=cap.img;}
+    still.onload=()=>{still.style.display="block";video.style.display="none";mmPerPx=cap.mmPerPx;calPts=cap.calPts.map(p=>({x:p.x,y:p.y}));marks=cap.marks.map(m=>({type:m.type,kind:m.kind||DEF[m.type].kind,pts:m.pts.map(p=>({x:p.x,y:p.y})),text:m.text}));markerCorners=null;zoom=1;$("zoom").value=1;$("zoomVal").textContent="1.0×";placing=[];applyParams(cap.params);if(mmPerPx)showScale();$("editbar").classList.add("show");$("snapBtn").disabled=true;setStatus("Redigerer — træk i punkterne. Tryk Gem ændringer.");renderMarks();syncCanvas();draw();};still.src=cap.img;}
   function applyParams(P){$("level").value=P.L;$("weldType").value=P.wt;$("tThk").value=P.t;$("nomA").value=P.nomA;$("aARef").value=P.aA;$("sThk").value=P.s;$("bWid").value=P.b;$("concave").checked=!!P.concave;}
-  $("saveEditBtn").addEventListener("click",()=>{if(editIndex<0)return;const cap=captures[editIndex];const P=params();cap.mmPerPx=mmPerPx;cap.calPts=calPts.map(p=>({x:p.x,y:p.y}));cap.marks=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y}))}));cap.params=P;cap.results=cap.marks.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));
+  $("saveEditBtn").addEventListener("click",()=>{if(editIndex<0)return;const cap=captures[editIndex];const P=params();cap.mmPerPx=mmPerPx;cap.calPts=calPts.map(p=>({x:p.x,y:p.y}));cap.marks=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y})),text:m.text}));cap.params=P;cap.results=cap.marks.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));
     makeThumb(cap,u=>{cap.thumb=u;renderGallery();if(isMobile)idbPut(toRecord(cap));else if(hasFS&&dirHandle)writeToFolder("makro-"+cap.id+".jpg",dataURLtoBlob(u));});sbUpdate(cap);closeEditor();});
   $("closeEditBtn").addEventListener("click",closeEditor);
   function closeEditor(){editIndex=-1;$("editbar").classList.remove("show");$("snapBtn").disabled=false;if(prevState){source=prevState.source;zoom=prevState.zoom;$("zoom").value=zoom;$("zoomVal").textContent=zoom.toFixed(1)+"×";calPts=prevState.calPts;marks=prevState.marks;mmPerPx=prevState.mmPerPx;fault=prevState.fault;mode=prevState.mode;ctxMode=prevState.ctxMode;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.toggle("active",x.dataset.src===source));}still.src="";switchSource();if(source==="live"){still.style.display="none";video.style.display="block";}setStatus("Redigering lukket.");setHint();renderMarks();syncCanvas();draw();}
@@ -493,7 +513,7 @@
     captures.forEach((c,ci)=>{c.marks.forEach((m,i)=>{const r=c.results[i];const def=DEF[m.type];
       if(def.kind==="measure"){nM++;mRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${r.disp}</td></tr>`;}
       else{nA++;if(r.ok===false)nFail++;const vd=r.ok===true?'<span style="color:#1a7f37;font-weight:700">OK</span>':r.ok===false?'<span style="color:#cf222e;font-weight:700">AFVIST</span>':'—';aRows+=`<tr><td>${ci+1}.${i+1}</td><td>${def.name}</td><td>${c.params.wt==="fillet"?"Kantsøm":"Stuksøm"}</td><td>${c.params.L}</td><td>${r.disp}</td><td>${r.allowTxt||"—"}</td><td>${vd}</td></tr>`;}});
-      imgs+=`<figure><img src="${c.thumb||c.img}"><figcaption>Billede ${ci+1} — ${c.marks.length} markeringer</figcaption></figure>`;});
+      imgs+=`<figure><img src="${c.thumb||c.img}"><figcaption>Billede ${ci+1} — ${c.marks.length} markeringer${c.caption?" · "+c.caption:""}</figcaption></figure>`;});
     const concl=nA?(nFail>0?`<span style="color:#cf222e;font-weight:700">${nFail} af ${nA} vurderinger afvist</span>`:`<span style="color:#1a7f37;font-weight:700">Alle ${nA} vurderinger OK</span>`):"ingen vurderinger";
     const mSec=nM?`<h2>Målinger</h2><table><thead><tr><th>#</th><th>Type</th><th>Værdi</th></tr></thead><tbody>${mRows}</tbody></table>`:"";
     const aSec=nA?`<h2>Vurderinger (ISO 5817:2023)</h2><table><thead><tr><th>#</th><th>Fejltype</th><th>Søm</th><th>Niveau</th><th>Målt</th><th>Grænse</th><th>Vurdering</th></tr></thead><tbody>${aRows}</tbody></table>`:"";
@@ -569,17 +589,33 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
         if(payload.eventType==="INSERT"||payload.eventType==="UPDATE")sbIngest(payload.new);
         else if(payload.eventType==="DELETE"&&payload.old){const id=payload.old.id;const i=captures.findIndex(c=>c.id===id);if(i>=0){captures.splice(i,1);knownIds.delete(id);renderGallery();}}
       }).subscribe();
-      pruneExpired();setSyncPill();sbStatus("Forbundet til sag '"+sag+"'. "+((data||[]).length)+" billeder. Nye deles automatisk i virksomheden.",true);}catch(e){sbStatus("Forbindelsesfejl: "+(e.message||e));}}
+      pruneExpired();setSyncPill();sbStatus("Forbundet til sag '"+sag+"'. "+((data||[]).length)+" billeder. Nye deles automatisk i virksomheden.",true);
+      try{await sb.from("wg_sager").upsert({org_id:sbOrg,sag,updated_at:new Date().toISOString()});}catch(e){}
+      try{const{data:sd}=await sb.from("wg_sager").select("beskrivelse").eq("org_id",sbOrg).eq("sag",sag).single();$("sbDesc").value=sd&&sd.beskrivelse?sd.beskrivelse:"";}catch(e){$("sbDesc").value="";}
+      loadSager();
+    }catch(e){sbStatus("Forbindelsesfejl: "+(e.message||e));}}
+  let _sager=[];
+  async function loadSager(){if(!sb||!sbOrg)return;try{const{data}=await sb.from("wg_sager").select("*").eq("org_id",sbOrg).order("updated_at",{ascending:false});_sager=data||[];renderSager();}catch(e){}}
+  function renderSager(){const q=($("sagSearch").value||"").toLowerCase();const list=$("sagList");list.innerHTML="";
+    _sager.filter(s=>!q||(s.sag+" "+(s.beskrivelse||"")).toLowerCase().includes(q)).slice(0,40).forEach(s=>{
+      const row=document.createElement("div");row.className="ditem";
+      const when=s.updated_at?new Date(s.updated_at).toLocaleDateString("da-DK"):"";
+      row.innerHTML=`<span class="nm">${s.sag}${s.beskrivelse?' <span style="color:var(--ink-dim)">— '+s.beskrivelse+'</span>':''}</span><span class="vl">${when}</span>`;
+      row.style.cursor="pointer";row.addEventListener("click",()=>{$("sbSag").value=s.sag;sbConnect();});
+      list.appendChild(row);});
+    if(!list.children.length)list.innerHTML='<div class="mini">Ingen sager fundet.</div>';}
+  function bindSagUI(){$("sagSearch").addEventListener("input",renderSager);
+    $("sbDescSave").addEventListener("click",async()=>{if(!sb||!sbOrg||!sbSag)return;const b=$("sbDesc").value;try{await sb.from("wg_sager").upsert({org_id:sbOrg,sag:sbSag,beskrivelse:b,updated_at:new Date().toISOString()});sbStatus("Sagsbeskrivelse gemt.",true);loadSager();}catch(e){sbStatus("Kunne ikke gemme beskrivelse.");}});}
   async function sbIngest(row){if(!canSee(row))return;
     if(knownIds.has(row.id)){const cap=captures.find(c=>c.id===row.id);if(cap){cap.marks=row.marks||[];cap.params=row.params||{};cap.mmPerPx=row.mm_per_px;cap.calPts=row.cal_pts||[];cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));makeThumb(cap,u=>{cap.thumb=u;renderGallery();});}return;}
     knownIds.add(row.id);
     try{const{data,error}=await sb.storage.from("wg-makro").download(row.img_path);if(error||!data)return;const url=await blobToDataURL(data);
-      const cap={id:row.id,created:row.created_at?Date.parse(row.created_at):Date.now(),keep:!!row.keep,path:row.img_path,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
+      const cap={id:row.id,created:row.created_at?Date.parse(row.created_at):Date.now(),keep:!!row.keep,caption:row.caption||"",path:row.img_path,img:url,W:row.w,H:row.h,mmPerPx:row.mm_per_px,calPts:row.cal_pts||[],marks:row.marks||[],params:row.params||{},results:[],thumb:null,remote:true};
       cap.results=cap.marks.map(m=>DEF[m.type].eval(valsForPts(m.type,cap.marks.length,m.pts,cap.mmPerPx),cap.params));
       captures.push(cap);makeThumb(cap,u=>{cap.thumb=u;renderGallery();});renderGallery();}catch(e){}}
   async function sbUpload(cap){if(!sb||!sbSag||!sbUser||!sbOrg)return;try{const path=sbOrg+"/"+sbSag+"/"+cap.id+".jpg";knownIds.add(cap.id);cap.path=path;
     await sb.storage.from("wg-makro").upload(path,dataURLtoBlob(cap.img),{contentType:"image/jpeg",upsert:true});
-    await sb.from("wg_maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params,keep:!!cap.keep});
+    await sb.from("wg_maalinger").upsert({id:cap.id,sag:sbSag,org_id:sbOrg,img_path:path,w:cap.W,h:cap.H,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts,marks:cap.marks,params:cap.params,keep:!!cap.keep,caption:cap.caption||""}); try{await sb.from("wg_sager").upsert({org_id:sbOrg,sag:sbSag,updated_at:new Date().toISOString()});}catch(e){}
   }catch(e){sbStatus("Upload-fejl: "+(e.message||e));}}
   async function sbUpdate(cap){if(!sb||!sbSag||!sbUser)return;try{await sb.from("wg_maalinger").update({marks:cap.marks,params:cap.params,mm_per_px:cap.mmPerPx,cal_pts:cap.calPts}).eq("id",cap.id);}catch(e){}}
   async function sbDelete(id){if(!sb||!sbSag||!sbUser)return;try{const cap=captures.find(c=>c.id===id);await sb.from("wg_maalinger").delete().eq("id",id);if(cap&&cap.img&&sbOrg)await sb.storage.from("wg-makro").remove([sbOrg+"/"+sbSag+"/"+id+".jpg"]);}catch(e){}}
@@ -603,7 +639,7 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
   if(SB_READY)sbInitClient(); else sbStatus("Tilføj SB_URL og SB_KEY i koden for at aktivere synk.");
   updateAuthUI(); // vis login-felter med det samme, også før forbindelse
   // hvis login-biblioteket loader sent (langsomt net), så forbind når det er klar
-  if(SB_READY && !sb){let tries=0;const t=setInterval(()=>{tries++;if(typeof supabase!=="undefined"&&supabase.createClient){clearInterval(t);sbInitClient();}else if(tries>40)clearInterval(t);},500);}
+  bindSagUI();if(SB_READY && !sb){let tries=0;const t=setInterval(()=>{tries++;if(typeof supabase!=="undefined"&&supabase.createClient){clearInterval(t);sbInitClient();}else if(tries>40)clearInterval(t);},500);}
   setSyncPill();
 
   /* ============ INIT ============ */
