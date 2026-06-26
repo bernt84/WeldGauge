@@ -210,7 +210,7 @@
     <div class="dlist" id="dlist"></div>
   </div>
 
-  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Frys billede</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>📸 Gem billede</button></div>
+  <div class="btn-grid"><button class="ghost" id="freezeBtn" style="display:none">📷 Tag billede</button><button class="ghost" id="undoBtn">↶ Fortryd sidste</button><button class="primary" id="snapBtn" disabled>💾 Gem i galleri</button></div>
 
   <div class="gallery" id="gallery">
     <h3>Gemte billeder <span class="count" id="galCount">0</span></h3>
@@ -346,11 +346,11 @@
   /* ============ KILDE ============ */
   document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
-    if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Frys billede";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
+    if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Tag billede";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(isMobile&&!saved?null:saved);}newImage();setHint();}
   function freezeFrame(){const{w:W,h:H}=mediaSize();if(!W||!video.videoWidth)return;const c=document.createElement("canvas");c.width=video.videoWidth;c.height=video.videoHeight;c.getContext("2d").drawImage(video,0,0,c.width,c.height);
-    still.onload=()=>{frozen=true;still.style.display="block";video.style.display="none";$("freezeBtn").textContent="🎥 Nyt foto (tilbage til live)";setHint();syncCanvas();draw();setStatus("Stillbillede frosset — mål i ro. Tryk 'Nyt foto' for at gå tilbage til live.");};
+    still.onload=()=>{frozen=true;still.style.display="block";video.style.display="none";$("freezeBtn").textContent="🎥 Nyt billede";setHint();syncCanvas();draw();setStatus("Billede taget — mål i ro. Tryk 'Nyt billede' for et nyt.");};
     still.src=c.toDataURL("image/jpeg",.92);}
-  function unfreeze(){frozen=false;still.style.display="none";video.style.display="block";still.src="";marks=[];placing=[];$("freezeBtn").textContent="📷 Frys billede";renderMarks();setHint();syncCanvas();draw();if(stream)requestAnimationFrame(loop);}
+  function unfreeze(){frozen=false;still.style.display="none";video.style.display="block";still.src="";marks=[];placing=[];$("freezeBtn").textContent="📷 Tag billede";renderMarks();setHint();syncCanvas();draw();if(stream)requestAnimationFrame(loop);}
   $("freezeBtn").addEventListener("click",()=>{if(source!=="live")return;if(frozen)unfreeze();else freezeFrame();});
   function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
 
@@ -491,7 +491,7 @@
   $("useAAbtn").addEventListener("click",()=>{const last=[...marks].reverse().find(m=>m.type==="aA");if(last){$("aARef").value=(dist(last.pts[0],last.pts[1])*mmPerPx).toFixed(2);renderMarks();draw();setStatus("aA sat fra seneste aA-måling.");}else setStatus("Mål aA først (Vurdering → Makrosnit → aA).");});
   $("undoBtn").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
 
-  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Frys billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
+  function setHint(){const h=$("hint");if(!ready()){h.innerHTML=source==="live"?(frozen?"Klik for at måle på stillbilledet":"Tryk 📷 Tag billede for at måle i ro — eller mål direkte"):"Vælg et billede";h.style.display="block";return;}
     if(calibrating){h.innerHTML="Sæt <b>2 punkter</b> på reference";h.style.display="block";return;}if(!mmPerPx){h.innerHTML="Kalibrér først";h.style.display="block";return;}
     const d=DEF[fault];
     if(d.mt==="athroat"){const n=placing.length;const steps=["Klik <b>2 punkter</b> langs <b>plade 1</b> (1/2)","Klik <b>2. punkt</b> på <b>plade 1</b> (2/2)","Klik <b>2 punkter</b> langs <b>plade 2</b> (1/2)","Klik <b>2. punkt</b> på <b>plade 2</b> (2/2)","Klik på <b>sømoverfladen</b> (a-mål)"];h.innerHTML="📐 "+(steps[n]||"Færdig — a beregnet");h.style.display="block";return;}
