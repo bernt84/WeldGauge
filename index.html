@@ -218,7 +218,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.11.0 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.12.0 (no-SW)</div>
   </div>
 
   <!-- ===== BILLEDBIBLIOTEK (sager → billeder) ===== -->
@@ -576,7 +576,28 @@
       else if(d.n===3){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length===3)rawline(placing[1],placing[2],col);}
       else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
       else if(placing.length>=2)rawline(placing[0],placing[1],col);
-      placing.forEach(p=>handle(v2c(p),col));}}
+      placing.forEach(p=>handle(v2c(p),col));}
+    if(loupeAt)drawLoupe(loupeAt.cx,loupeAt.cy);}
+  // Lup: viser et forstørret udsnit omkring punktet, placeret væk fra fingeren, med trådkors
+  function drawLoupe(cx,cy){const el=useStill()?still:video;const sw=el===video?video.videoWidth:el.naturalWidth,sh=el===video?video.videoHeight:el.naturalHeight;if(!sw||!sh||!mr)return;
+    const R=64*dpr;            // lup-radius på skærmen
+    const ZOOMF=2.6;           // ekstra forstørrelse i luppen
+    // kilde-pixel under fingeren
+    const srcX=(cx-mr.x)/mr.sx, srcY=(cy-mr.y)/mr.sx;
+    // hvor stor en del af kilden vises (mindre = mere zoom)
+    const span=(R*2)/(mr.sx*ZOOMF);
+    // placér luppen i modsatte hjørne af fingeren, så den ikke dækkes
+    const margin=12*dpr;let lx=cx>overlay.width/2?margin+R:overlay.width-margin-R;let ly=cy>overlay.height/2?margin+R:overlay.height-margin-R;
+    // hvis fingeren er øverst, vis luppen øverst; ellers nederst — undgå at dække punktet
+    ly=cy<overlay.height/2?overlay.height-margin-R:margin+R;
+    ctx.save();ctx.beginPath();ctx.arc(lx,ly,R,0,7);ctx.closePath();ctx.fillStyle="#000";ctx.fill();ctx.clip();
+    try{ctx.drawImage(el,srcX-span/2,srcY-span/2,span,span,lx-R,ly-R,R*2,R*2);}catch(e){}
+    ctx.restore();
+    // trådkors i midten
+    ctx.strokeStyle="rgba(57,197,207,.95)";ctx.lineWidth=1.5*dpr;ctx.beginPath();ctx.moveTo(lx-12*dpr,ly);ctx.lineTo(lx+12*dpr,ly);ctx.moveTo(lx,ly-12*dpr);ctx.lineTo(lx,ly+12*dpr);ctx.stroke();
+    ctx.beginPath();ctx.arc(lx,ly,3.5*dpr,0,7);ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=1*dpr;ctx.stroke();
+    // ring rundt om luppen
+    ctx.beginPath();ctx.arc(lx,ly,R,0,7);ctx.strokeStyle="rgba(255,255,255,.85)";ctx.lineWidth=2*dpr;ctx.stroke();}
   function drawMark(m,num){const def=DEF[m.type];const p=m.pts;
     if(def.mt==="note"){const col="#ffd166";const c=v2c(p[0]);label(c,(num+". "+(m.text||"(tom)")),col);handle(c,col);return;}
     const r=evalMark(m);const col=colorFor(def,r.ok);
@@ -608,10 +629,11 @@
   let pinch=null;
   function touchDist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
   function touchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
+  let loupeAt=null; // {cx,cy} i canvas-pixels — viser lup når man placerer/trækker med finger
   function down(e){
     // to fingre = pinch-zoom / panorering
-    if(e.touches&&e.touches.length===2){e.preventDefault();drag=null;athroatDrag=false;const curTotal=(hwZoom.supported?hwZoom.cur:1)*zoom;pinch={d:touchDist(e.touches),z:curTotal,mid:touchMid(e.touches),px:panX,py:panY};return;}
-    if(!ready())return;e.preventDefault();const{x,y}=getXY(e);const hit=hitTest(x,y);if(hit){drag=hit;return;}
+    if(e.touches&&e.touches.length===2){e.preventDefault();drag=null;athroatDrag=false;loupeAt=null;const curTotal=(hwZoom.supported?hwZoom.cur:1)*zoom;pinch={d:touchDist(e.touches),z:curTotal,mid:touchMid(e.touches),px:panX,py:panY};return;}
+    if(!ready())return;e.preventDefault();const{x,y}=getXY(e);if(e.touches)loupeAt={cx:x*dpr,cy:y*dpr};const hit=hitTest(x,y);if(hit){drag=hit;draw();return;}
     if(calibrating){if(calPts.length>=2)calPts=[];calPts.push(c2v(x,y));if(calPts.length===2)finishCal();draw();return;}
     if(!mmPerPx){setStatus("Kalibrér først.");return;}
     if(capTarget){capTarget.pts.push(c2v(x,y));const t=capTarget;capTarget=null;$("capBtn").style.display="none";renderMarks();showResult(t);setHint();draw();return;}
@@ -628,12 +650,13 @@
       // panorér med to-finger-bevægelsen (kun digital del panorerer)
       panX=pinch.px+(mid.x-pinch.mid.x);panY=pinch.py+(mid.y-pinch.mid.y);
       setZoom(total);return;}
-    if(athroatDrag){e.preventDefault();const{x,y}=getXY(e);placing[4]=c2v(x,y);drawAthroatPreview();return;}
-    if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
+    if(athroatDrag){e.preventDefault();const{x,y}=getXY(e);if(e.touches)loupeAt={cx:x*dpr,cy:y*dpr};placing[4]=c2v(x,y);drawAthroatPreview();return;}
+    if(!drag||!ready())return;e.preventDefault();const{x,y}=getXY(e);if(e.touches)loupeAt={cx:x*dpr,cy:y*dpr};drag.arr[drag.idx]=c2v(x,y);if(drag.cal&&calPts.length===2)setScale();if(drag.mark)showResult(drag.mark);renderMarks();draw();}
   function up(e){
     if(pinch){if(!e.touches||e.touches.length<2)pinch=null;return;}
+    loupeAt=null;
     if(athroatDrag){athroatDrag=false;const m={type:fault,kind:DEF[fault].kind,pts:placing.slice()};marks.push(m);placing=[];renderMarks();showResult(m);setHint();if(DEF[m.type].cap){lastAthroat=m;$("capBtn").style.display="block";}draw();return;}
-    drag=null;}
+    drag=null;draw();}
   // live-preview af a-stregen mens man trækker
   function drawAthroatPreview(){draw();if(placing.length<5)return;const root=lineIntersect(placing[0],placing[1],placing[2],placing[3])||{x:(placing[1].x+placing[3].x)/2,y:(placing[1].y+placing[3].y)/2};
     const S=placing[4];const a=dist(root,S)*mmPerPx;const rc=v2c(root),sc=v2c(S);
