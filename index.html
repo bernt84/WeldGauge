@@ -232,6 +232,8 @@
   const SB_KEY="sb_publishable_eNPz7BmzMfoXNYVfX7DVSQ_q0o2xA_H";
   const SB_READY = /^https?:\/\//.test(SB_URL) && SB_KEY.length>20;
   const $=id=>document.getElementById(id);
+  if(!Promise.any){Promise.any=function(ps){return new Promise((res,rej)=>{let n=ps.length,errs=[];if(!n)rej(new Error("none"));ps.forEach((p,i)=>Promise.resolve(p).then(res,e=>{errs[i]=e;if(--n===0)rej(errs[0]);}));});};}
+  
   const video=$("video"),still=$("still"),overlay=$("overlay"),ctx=overlay.getContext("2d"),stage=$("stage");
   const isTouch=('ontouchstart' in window)||navigator.maxTouchPoints>0;
   const isMobile=isTouch&&Math.min(screen.width,screen.height)<820;
@@ -745,23 +747,21 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
     if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet, og prøv igen om et øjeblik.");return;}}
     sbStatus("Logger ind…");
+    // Metode 1: bibliotekets login (virker med publishable-nøgle)
+    const viaLib=(async()=>{const{data,error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error)throw error;return data;})();
+    // Metode 2: direkte REST-kald som backup
+    const viaFetch=(async()=>{const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),12000);
+      const res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});
+      clearTimeout(to);const j=await res.json().catch(()=>({}));if(!res.ok)throw new Error(j.error_description||j.msg||j.error||("HTTP "+res.status));
+      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}return{user:j.user};})();
     try{
-      // Direkte kald til auth-endpoint (uafhængigt af om biblioteket hænger)
-      const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),20000);
-      const res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{
-        method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY},
-        body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});
-      clearTimeout(to);
-      const j=await res.json().catch(()=>({}));
-      if(!res.ok){sbStatus("Login-fejl: "+(j.error_description||j.msg||j.error||("HTTP "+res.status)));return;}
-      // Giv tokens til klienten, så session gemmes og resten af appen virker
-      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}
-      // Hvis onAuthStateChange ikke fyrer, så anvend sessionen manuelt
-      try{const{data}=await sb.auth.getSession();await applySession(data.session||{user:j.user});}catch(e){await applySession({user:j.user});}
+      const data=await Promise.any([viaLib,viaFetch]);
+      try{const{data:s}=await sb.auth.getSession();await applySession(s.session||{user:data.user});}catch(e){await applySession({user:data.user});}
       $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
     }catch(e){
-      const msg=(e&&e.name==="AbortError")?"Tidsudløb — serveren svarede ikke (20s).":("Login-fejl: "+(e.message||e));
-      console.error("WeldGauge login:",e);sbStatus(msg);
+      const err=(e&&e.errors&&e.errors[0])||e;const m=(err&&(err.message||err.name))||String(err);
+      console.error("WeldGauge login:",e);
+      sbStatus(/invalid|credential|password/i.test(m)?"Login-fejl: forkert e-mail eller adgangskode.":("Login-fejl: "+m));
     }}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
