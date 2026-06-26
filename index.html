@@ -115,9 +115,9 @@
   <div class="menupanel" id="menuPanel">
     <div class="row" style="justify-content:flex-end"><select id="langSel" style="flex:0 0 auto;padding:6px 8px"><option value="da">🇩🇰 Dansk</option><option value="en">🇬🇧 English</option><option value="lt">🇱🇹 Lietuvių</option></select></div>
     <h2 data-i18n="src">Kilde</h2>
-    <div class="seg" id="sourceSeg"><button data-src="live" class="active" data-i18n="srcLive">📷 Live kamera</button><button data-src="upload" data-i18n="srcUpload">🖼 Upload billede</button></div>
+    <div class="btn-grid" id="sourceSeg" style="margin-top:6px"><button data-src="live" class="primary" data-i18n="srcLive">📷 Live kamera</button><button data-src="upload" class="ghost" data-i18n="srcUpload">🖼 Upload billede</button></div>
     <div class="row" id="liveRow"><select id="camSelect"><option>Indlæser…</option></select></div>
-    <div class="seg" id="facingSeg" style="display:none"><button data-face="environment" class="active" data-i18n="rear">📷 Bagkamera</button><button data-face="user" data-i18n="front">🤳 Forkamera</button></div>
+    <div class="btn-grid" id="facingSeg" style="display:none;margin-top:6px"><button data-face="environment" class="primary" data-i18n="rear">📷 Bagkamera</button><button data-face="user" class="ghost" data-i18n="front">🤳 Forkamera</button></div>
     <div class="row" id="uploadRow" style="display:none"><input type="file" id="fileInput" accept="image/*" style="flex:1;font-size:12px;color:var(--ink-dim)"></div>
 
     <h2 data-i18n="saveExp">Gem &amp; eksport</h2>
@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.8 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.4.0 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -391,11 +391,11 @@
   $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("");$("hint").innerHTML=(I18N[lang]||I18N.da).capClick;$("hint").style.display="block";});
 
   /* ============ KILDE ============ */
-  document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");source=b.dataset.src;switchSource();toggleMenu(false);}));
+  document.querySelectorAll("#sourceSeg button").forEach(b=>b.addEventListener("click",()=>{if(editIndex>=0)return;document.querySelectorAll("#sourceSeg button").forEach(x=>{x.classList.remove("primary");x.classList.add("ghost");});b.classList.remove("ghost");b.classList.add("primary");source=b.dataset.src;switchSource();toggleMenu(false);}));
   function switchSource(){$("liveRow").style.display=source==="live"?"flex":"none";$("uploadRow").style.display=source==="upload"?"flex":"none";$("zoomWrap").style.display="none";$("hwZoomWrap").style.display="none";
     if(source==="upload"){stopCamera();video.style.display="none";$("freezeBtn").style.display="none";}else{still.style.display="none";haveImage=false;frozen=false;video.style.display="block";$("freezeBtn").style.display="block";$("freezeBtn").textContent="📷 Tag billede";
       if(isMobile){$("liveRow").style.display="none";$("facingSeg").style.display="flex";startCamera(null,facing);}
-      else{const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(saved);}
+      else{$("facingSeg").style.display="none";$("liveRow").style.display="flex";const saved=$("camSelect").value||localStorage.getItem("mm_cam")||null;startCamera(saved);}
     }newImage();setHint();}
   function freezeFrame(){const{w:W,h:H}=mediaSize();if(!W||!video.videoWidth)return;const c=document.createElement("canvas");c.width=video.videoWidth;c.height=video.videoHeight;c.getContext("2d").drawImage(video,0,0,c.width,c.height);
     still.onload=()=>{frozen=true;still.style.display="block";video.style.display="none";$("freezeBtn").textContent="🎥 Nyt billede";setHint();syncCanvas();draw();setStatus("Billede taget — mål i ro. Tryk 'Nyt billede' for et nyt.");};
@@ -654,7 +654,7 @@
   $("saveEditBtn").addEventListener("click",()=>{if(editIndex<0)return;const cap=captures[editIndex];const P=params();cap.mmPerPx=mmPerPx;cap.calPts=calPts.map(p=>({x:p.x,y:p.y}));cap.marks=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y})),text:m.text}));cap.params=P;cap.results=cap.marks.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));
     makeThumb(cap,u=>{cap.thumb=u;renderGallery();if(isMobile)idbPut(toRecord(cap));else if(hasFS&&dirHandle)writeToFolder("makro-"+cap.id+".jpg",dataURLtoBlob(u));});sbUpdate(cap);closeEditor();});
   $("closeEditBtn").addEventListener("click",closeEditor);
-  function closeEditor(){editIndex=-1;$("editbar").classList.remove("show");$("snapBtn").disabled=false;if(prevState){source=prevState.source;zoom=prevState.zoom;$("zoom").value=zoom;$("zoomVal").textContent=zoom.toFixed(1)+"×";calPts=prevState.calPts;marks=prevState.marks;mmPerPx=prevState.mmPerPx;fault=prevState.fault;mode=prevState.mode;ctxMode=prevState.ctxMode;document.querySelectorAll("#sourceSeg button").forEach(x=>x.classList.toggle("active",x.dataset.src===source));}still.src="";switchSource();if(source==="live"){still.style.display="none";video.style.display="block";}setStatus("Redigering lukket.");setHint();renderMarks();syncCanvas();draw();}
+  function closeEditor(){editIndex=-1;$("editbar").classList.remove("show");$("snapBtn").disabled=false;if(prevState){source=prevState.source;zoom=prevState.zoom;$("zoom").value=zoom;$("zoomVal").textContent=zoom.toFixed(1)+"×";calPts=prevState.calPts;marks=prevState.marks;mmPerPx=prevState.mmPerPx;fault=prevState.fault;mode=prevState.mode;ctxMode=prevState.ctxMode;document.querySelectorAll("#sourceSeg button").forEach(x=>{const on=x.dataset.src===source;x.classList.toggle("primary",on);x.classList.toggle("ghost",!on);});}still.src="";switchSource();if(source==="live"){still.style.display="none";video.style.display="block";}setStatus("Redigering lukket.");setHint();renderMarks();syncCanvas();draw();}
 
   /* ============ RAPPORT ============ */
   function buildReportHTML(rlang){const t=I18N[rlang||lang]||I18N.da;const lng=rlang||lang;const op=$("rpOperator").value||"—",job=$("rpJob").value||"—",date=new Date().toLocaleString(lng==="en"?"en-GB":lng==="lt"?"lt-LT":"da-DK");
@@ -705,7 +705,7 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
       setStatus("Sag eksporteret som "+sagName+".zip ("+captures.length+" billeder + rapport).");});});
 
   $("camSelect").addEventListener("change",()=>{try{localStorage.setItem("mm_cam",$("camSelect").value);}catch(e){}if(source==="live")startCamera($("camSelect").value);});
-  document.querySelectorAll("#facingSeg button").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("#facingSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");facing=b.dataset.face;if(source==="live"){await startCamera(null,facing);
+  document.querySelectorAll("#facingSeg button").forEach(b=>b.addEventListener("click",async()=>{document.querySelectorAll("#facingSeg button").forEach(x=>{x.classList.remove("primary");x.classList.add("ghost");});b.classList.remove("ghost");b.classList.add("primary");facing=b.dataset.face;if(source==="live"){await startCamera(null,facing);
     try{const s=track&&track.getSettings?track.getSettings():null;if(s&&s.facingMode&&s.facingMode!==facing)setStatus("⚠ Kunne ikke skifte til "+(facing==="user"?"forkamera":"bagkamera")+" — enheden gav "+(s.facingMode==="user"?"forkamera":"bagkamera")+".");}catch(e){}}}));
   // ☰ hovedmenu
   function toggleMenu(show){const p=$("menuPanel"),b=$("menuBack");const on=show===undefined?!p.classList.contains("show"):show;p.classList.toggle("show",on);b.classList.toggle("show",on);}
