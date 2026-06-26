@@ -55,7 +55,7 @@
   button.ghost{background:transparent}button:disabled{opacity:.4;cursor:not-allowed}
   .btn-grid{display:flex;gap:8px}.btn-grid button{flex:1}
   .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg button{flex:1;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px}
+  .seg button{flex:1;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px;min-height:38px;color:var(--ink)}
   .seg button:last-child{border-right:none}.seg button.active{background:var(--cyan);color:#04181b}
   .seg.mode button.active{background:var(--violet);color:#160a26}
   .seg.mode{border-width:2px}
@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.2</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.3</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -748,24 +748,21 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
     if(!sbUser)fillAccts();
     if(canAdmin){renderOrgUsers();if(sbSuper)renderOrgs();}}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
-    if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet, og prøv igen om et øjeblik.");return;}}
-    sbStatus("Logger ind…");
-    // Metode 1: bibliotekets login (virker med publishable-nøgle)
-    const viaLib=(async()=>{const{data,error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error)throw error;return data;})();
-    // Metode 2: direkte REST-kald som backup
-    const viaFetch=(async()=>{const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),12000);
-      const res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});
-      clearTimeout(to);const j=await res.json().catch(()=>({}));if(!res.ok)throw new Error(j.error_description||j.msg||j.error||("HTTP "+res.status));
-      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}return{user:j.user};})();
+    if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet.");return;}}
+    sbStatus("Logger ind… (kontakter server)");
+    // Direkte REST-login med kort timeout, så vi altid får svar
     try{
-      const data=await Promise.any([viaLib,viaFetch]);
-      try{const{data:s}=await sb.auth.getSession();await applySession(s.session||{user:data.user});}catch(e){await applySession({user:data.user});}
-      $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
-    }catch(e){
-      const err=(e&&e.errors&&e.errors[0])||e;const m=(err&&(err.message||err.name))||String(err);
-      console.error("WeldGauge login:",e);
-      sbStatus(/invalid|credential|password/i.test(m)?"Login-fejl: forkert e-mail eller adgangskode.":("Login-fejl: "+m));
-    }}
+      const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),12000);
+      let res;
+      try{res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});}
+      catch(netErr){clearTimeout(to);sbStatus(netErr.name==="AbortError"?"Timeout: serveren svarede ikke (12s). Netværket blokerer måske supabase.co.":"Netværksfejl: "+(netErr.message||netErr)+" — kan ikke nå serveren.");return;}
+      clearTimeout(to);
+      const txt=await res.text();let j={};try{j=JSON.parse(txt);}catch(e){}
+      if(!res.ok){sbStatus("Login afvist (HTTP "+res.status+"): "+(j.error_description||j.msg||j.error||txt.slice(0,80)));return;}
+      try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}
+      try{const{data}=await sb.auth.getSession();await applySession(data.session||{user:j.user});}catch(e){await applySession({user:j.user});}
+      $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind ✓",true);
+    }catch(e){sbStatus("Uventet fejl: "+(e&&(e.message||e.name)||e));console.error("WeldGauge login:",e);}}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
