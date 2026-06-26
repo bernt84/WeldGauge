@@ -33,8 +33,10 @@
   body.fs .controls,body.fs header{display:none!important}
   body.fs #fsBtn{top:calc(8px + env(safe-area-inset-top,0px))}
   #fsBar{display:none}
-  body.fs #fsBar{display:flex;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:55;gap:8px;background:rgba(13,17,23,.8);border:1px solid var(--line);border-radius:12px;padding:8px}
+  body.fs #fsBar{display:flex;flex-wrap:wrap;justify-content:center;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:55;gap:8px;background:rgba(13,17,23,.82);border:1px solid var(--line);border-radius:12px;padding:8px;max-width:94vw}
   body.fs #fsBar button{min-height:0;padding:10px 16px;font-size:18px}
+  body.fs #fsBar select{min-height:0;padding:8px 6px;font-size:13px;max-width:140px;background:var(--panel-2);color:var(--ink);border:1px solid var(--line);border-radius:7px}
+  #fsMode{flex:0 0 auto}
   video,img#still,canvas#overlay{position:absolute;inset:0;width:100%;height:100%}
   video,img#still{object-fit:contain;background:#000}img#still{display:none}
   canvas#overlay{touch-action:none}
@@ -116,7 +118,7 @@
   <div class="hint" id="hint">Vælg kilde nedenfor</div>
   <div class="readout" id="readout"></div>
   <div class="err" id="err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8.5l4-3v13l-4-3v-7zM6 5.5h11a2 2 0 012 2v9a2 2 0 01-2 2H6"/><line x1="3" y1="3" x2="21" y2="21" stroke-width="2"/></svg><div id="errMsg">Kunne ikke få adgang til kameraet.</div></div>
-  <div id="fsBar"><button class="ghost" id="fsFreeze">📷</button><button class="ghost" id="fsUndo">↶</button><button class="primary" id="fsSnap">💾</button></div>
+  <div id="fsBar"><select id="fsMode" title="Tilstand"><option value="measure">📏</option><option value="assess">✓</option></select><select id="fsFault" title="Måletype"></select><button class="ghost" id="fsCal">📏</button><button class="ghost" id="fsFreeze">📷</button><button class="ghost" id="fsUndo">↶</button><button class="primary" id="fsSnap">💾</button></div>
 </div>
 
 <div class="controls" id="controls">
@@ -187,7 +189,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.5.0 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.6.0 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -386,15 +388,18 @@
     return{mm:dist(pts[0],pts[1])*scale};}
 
   /* ============ tilstand / fejltype ============ */
-  document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;
-    $("caseCard").style.display=mode==="assess"?"flex":"none";$("ctxSeg").style.display=mode==="assess"?"flex":"none";$("toolLabel").textContent=mode==="assess"?"Fejltype":"Måletype";placing=[];fillFaults();setHint();draw();}));
+  document.querySelectorAll("#modeSeg button").forEach(b=>b.addEventListener("click",()=>setMode(b.dataset.mode)));
   document.querySelectorAll("#ctxSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#ctxSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");ctxMode=b.dataset.ctx;placing=[];fillFaults();setHint();draw();}));
-  function fillFaults(){const sel=$("faultSelect");sel.innerHTML="";const grp=mode==="measure"?"measure":ctxMode;
-    const keys=Object.keys(DEF).filter(k=>DEF[k].grp===grp);
-    keys.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=nameOf(k);sel.appendChild(o);});
-    fault=sel.value||keys[0]||"m_length";if(!DEF[fault])fault=keys[0]||"m_length";
+  function fillFaults(){const grp=mode==="measure"?"measure":ctxMode;const keys=Object.keys(DEF).filter(k=>DEF[k].grp===grp);
+    [["faultSelect"],["fsFault"]].forEach(([id])=>{const sel=$(id);if(!sel)return;sel.innerHTML="";keys.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=nameOf(k);sel.appendChild(o);});});
+    fault=$("faultSelect").value||keys[0]||"m_length";if(!DEF[fault])fault=keys[0]||"m_length";
+    $("faultSelect").value=fault;if($("fsFault"))$("fsFault").value=fault;if($("fsMode"))$("fsMode").value=mode;
     $("concaveWrap").style.display=(DEF[fault]&&DEF[fault].concave)?"flex":"none";}
-  $("faultSelect").addEventListener("change",e=>{fault=e.target.value;placing=[];capTarget=null;$("capBtn").style.display="none";$("concaveWrap").style.display=(DEF[fault]&&DEF[fault].concave)?"flex":"none";setHint();draw();});
+  function setFault(v){fault=v;placing=[];capTarget=null;$("capBtn").style.display="none";$("faultSelect").value=v;if($("fsFault"))$("fsFault").value=v;$("concaveWrap").style.display=(DEF[fault]&&DEF[fault].concave)?"flex":"none";setHint();draw();}
+  $("faultSelect").addEventListener("change",e=>setFault(e.target.value));
+  $("fsFault")&&$("fsFault").addEventListener("change",e=>setFault(e.target.value));
+  function setMode(m){mode=m;document.querySelectorAll("#modeSeg button").forEach(x=>x.classList.toggle("active",x.dataset.mode===m));$("caseCard").style.display=mode==="assess"?"flex":"none";$("ctxSeg").style.display=mode==="assess"?"flex":"none";$("toolLabel").textContent=mode==="assess"?"Fejltype":"Måletype";if($("fsMode"))$("fsMode").value=m;placing=[];fillFaults();setHint();draw();}
+  $("fsMode")&&$("fsMode").addEventListener("change",e=>setMode(e.target.value));
   $("capBtn").addEventListener("click",()=>{if(!lastAthroat)return;capTarget=lastAthroat;setStatus("");$("hint").innerHTML=(I18N[lang]||I18N.da).capClick;$("hint").style.display="block";});
 
   /* ============ KILDE ============ */
@@ -415,6 +420,7 @@
   $("freezeBtn").addEventListener("click",()=>{if(source!=="live")return;if(frozen)unfreeze();else freezeFrame();});
   function toggleFs(on){const v=on===undefined?!document.body.classList.contains("fs"):on;document.body.classList.toggle("fs",v);$("fsBtn").textContent=v?"✕":"⛶";setTimeout(()=>{syncCanvas();draw();},60);}
   $("fsBtn").addEventListener("click",()=>toggleFs());
+  $("fsCal").addEventListener("click",()=>$("calBtn").click());
   $("fsFreeze").addEventListener("click",()=>{if(source==="live"){if(frozen)unfreeze();else freezeFrame();}});
   $("fsUndo").addEventListener("click",()=>{if(placing.length)placing=[];else if(marks.length)marks.pop();renderMarks();draw();});
   $("fsSnap").addEventListener("click",()=>$("snapBtn").click());
