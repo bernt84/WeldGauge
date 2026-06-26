@@ -608,7 +608,13 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
     if(canAdmin){renderOrgUsers();if(sbSuper)renderOrgs();}}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
     if(!sb){if(!sbInitClient()){sbStatus("Kan ikke forbinde — tjek internet og prøv igen.");return;}}
-    sbStatus("Logger ind…");const{error}=await sb.auth.signInWithPassword({email:em,password:pw});if(error){sbStatus("Login-fejl: "+error.message);return;}$("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);}
+    sbStatus("Logger ind…");
+    try{
+      const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("Tidsudløb — tjek internet")),15000));
+      const{error}=await Promise.race([sb.auth.signInWithPassword({email:em,password:pw}),timeout]);
+      if(error){sbStatus("Login-fejl: "+error.message);return;}
+      $("sbPass").value="";sbStatus("Logget ind. Indtast Sag-id og Forbind.",true);
+    }catch(e){sbStatus("Login-fejl: "+(e.message||e));}}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
@@ -679,14 +685,27 @@ ${mSec}${aSec}<h2>Billeder</h2>${imgs}
     }catch(e){$("auStatus").textContent="Fejl: "+(e.message||e);}}
   $("auCreate").addEventListener("click",createUser);
   async function renderOrgUsers(){if(!sb)return;try{
-    let q=sb.from("wg_profiles").select("id,email,role,org_id").order("email",{ascending:true});
+    let q=sb.from("wg_profiles").select("id,email,role,org_id,is_superadmin").order("email",{ascending:true});
     if(!sbSuper&&sbOrg)q=q.eq("org_id",sbOrg);
     const{data}=await q;const orgName=id=>{const o=_orgs.find(x=>x.id===id);return o?o.name:"";};
-    const list=$("auList");list.innerHTML="";(data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
+    const list=$("auList");list.innerHTML="";
+    const hdr=document.createElement("div");hdr.className="mini";hdr.style.marginBottom="4px";
+    hdr.textContent=sbSuper?("Alle brugere ("+((data||[]).length)+") — på tværs af virksomheder"):("Brugere i din virksomhed ("+((data||[]).length)+")");
+    list.appendChild(hdr);
+    (data||[]).forEach(u=>{const row=document.createElement("div");row.className="ditem";
       const on=sbSuper&&u.org_id?(" · "+(orgName(u.org_id)||"")):"";const me=sbUser&&u.id===sbUser.id;
-      row.innerHTML=`<span class="vd" style="background:${u.role==="org_admin"?"#a371f7":"#39c5cf"}"></span><span class="nm">${u.email}${on}</span><span class="vl">${u.role==="org_admin"?"org-admin":"bruger"}</span>${me?"":`<button data-del-user="${u.id}" data-email="${u.email}" title="Slet bruger">✕</button>`}`;
+      const roleTxt=u.is_superadmin?"super-admin":u.role==="org_admin"?"org-admin":"bruger";
+      const dot=u.is_superadmin?"#f0883e":u.role==="org_admin"?"#a371f7":"#39c5cf";
+      const canEdit=!me&&!u.is_superadmin;
+      const toBe=u.role==="org_admin"?"member":"org_admin";const toBeTxt=u.role==="org_admin"?"→ bruger":"→ org-admin";
+      row.innerHTML=`<span class="vd" style="background:${dot}"></span><span class="nm">${u.email}${on}</span><span class="vl">${roleTxt}</span>`+
+        (canEdit?`<button data-role="${u.id}" data-to="${toBe}" title="Skift rolle" style="font-size:11px;padding:2px 6px">${toBeTxt}</button>`:"")+
+        (canEdit?`<button data-del-user="${u.id}" data-email="${u.email}" title="Slet bruger">✕</button>`:"");
+      const rb=row.querySelector("[data-role]");if(rb)rb.addEventListener("click",()=>setRole(rb.dataset.role,rb.dataset.to,u.email));
       const db=row.querySelector("[data-del-user]");if(db)db.addEventListener("click",()=>deleteUser(db.dataset.delUser,db.dataset.email));
       list.appendChild(row);});}catch(e){}}
+  async function setRole(id,role,email){$("auStatus").textContent="Skifter rolle…";const{ok,j}=await callAdmin({action:"set_role",user_id:id,role});
+    if(!ok){$("auStatus").textContent="Fejl: "+(j.error||"");return;}$("auStatus").textContent=email+" er nu "+(role==="org_admin"?"org-admin":"bruger")+".";renderOrgUsers();}
   async function deleteUser(id,email){if(!confirm("Slet brugeren "+email+"? Dette kan ikke fortrydes."))return;
     $("auStatus").textContent="Sletter…";const{ok,j}=await callAdmin({action:"delete_user",user_id:id});
     if(!ok){$("auStatus").textContent="Fejl: "+(j.error||"");return;}$("auStatus").textContent="Slettet: "+email;renderOrgUsers();}
