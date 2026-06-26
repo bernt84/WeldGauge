@@ -1,6 +1,6 @@
 // WeldGauge — service worker
 // Versionér cachen ved hver ny udgivelse, så klienter henter nyt.
-const CACHE = 'weldgauge-v1.9.0';
+const CACHE = 'weldgauge-v1.9.1';
 const CORE = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
