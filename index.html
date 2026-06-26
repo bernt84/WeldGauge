@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.6 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.7 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -425,8 +425,9 @@
     if(useFacing)tries.push({video:{facingMode:face}});
     tries.push({video:true});
     let ok=false,lastErr=null;
+    setStatus("Starter kamera…");
     for(const c of tries){try{stream=await navigator.mediaDevices.getUserMedia(Object.assign({audio:false},c));ok=true;break;}catch(e){lastErr=e;}}
-    if(!ok){showErr(true,(lastErr&&(lastErr.message||lastErr.name))||"Adgang nægtet");return;}
+    if(!ok){const msg=(lastErr&&(lastErr.message||lastErr.name))||"Adgang nægtet";showErr(true,msg);setStatus("🚫 Kamera kunne ikke starte: "+msg+". Tjek at du har givet kamera-adgang (tryk 'aA' i adresselinjen → Indstillinger for websted → Kamera → Tillad).");return;}
     if(deviceId){try{localStorage.setItem("mm_cam",deviceId);}catch(e){}}
     video.srcObject=stream;track=stream.getVideoTracks()[0];
     try{const caps=track.getCapabilities?track.getCapabilities():null;if(caps&&caps.width&&caps.height){await track.applyConstraints({width:caps.width.max,height:caps.height.max});}}catch(e){}
