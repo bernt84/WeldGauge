@@ -69,8 +69,8 @@
   button.primary.on{background:var(--amber);color:#1a1100;border-color:var(--amber)}
   button.ghost{background:transparent}button:disabled{opacity:.4;cursor:not-allowed}
   .btn-grid{display:flex;gap:8px}.btn-grid button{flex:1}
-  .seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-  .seg button{flex:1;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px;min-height:38px;color:var(--ink)}
+  .seg{display:flex;align-items:stretch;min-height:40px;flex:0 0 auto;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .seg button{flex:1 1 0;min-width:0;border:none;border-radius:0;background:var(--panel-2);border-right:1px solid var(--line);font-size:13px;padding:9px 4px;min-height:40px;color:var(--ink)}
   .seg button:last-child{border-right:none}.seg button.active{background:var(--cyan);color:#04181b}
   .seg.mode button.active{background:var(--violet);color:#160a26}
   .seg.mode{border-width:2px}
@@ -197,7 +197,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.9.2 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.9.3 (no-SW)</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
