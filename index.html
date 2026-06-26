@@ -180,7 +180,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.3</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.3.4</div>
   </div>
 
   <!-- ===== HOVEDSKÆRM (rent måle-flow) ===== -->
@@ -750,19 +750,23 @@ ${mSec}${aSec}<h2>${t.rImgsH}</h2>${imgs}
   async function sbLogin(){const em=$("sbEmail").value.trim(),pw=$("sbPass").value;if(!em||!pw){sbStatus("Udfyld e-mail og adgangskode.");return;}
     if(!sb){const okInit=sbInitClient();if(!okInit||!sb){sbStatus("Forbindelsen er ikke klar — tjek internet.");return;}}
     sbStatus("Logger ind… (kontakter server)");
-    // Direkte REST-login med kort timeout, så vi altid får svar
+    // Hård timeout der ALTID fyrer, uafhængigt af om fetch/AbortController hænger på iOS
+    const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error("__TIMEOUT__")),10000));
+    const doFetch=fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw})});
+    let res;
+    try{res=await Promise.race([doFetch,timeout]);}
+    catch(e){
+      if(e&&e.message==="__TIMEOUT__"){sbStatus("⏱ Timeout efter 10s — serveren svarer ikke. Netværket (firewall/APN) blokerer sandsynligvis supabase.co. Prøv et andet netværk/WiFi.");}
+      else{sbStatus("🚫 Netværksfejl: "+(e&&(e.message||e.name)||e)+" — kan ikke nå serveren.");}
+      return;
+    }
     try{
-      const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),12000);
-      let res;
-      try{res=await fetch(SB_URL+"/auth/v1/token?grant_type=password",{method:"POST",headers:{"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY},body:JSON.stringify({email:em,password:pw}),signal:ctrl.signal});}
-      catch(netErr){clearTimeout(to);sbStatus(netErr.name==="AbortError"?"Timeout: serveren svarede ikke (12s). Netværket blokerer måske supabase.co.":"Netværksfejl: "+(netErr.message||netErr)+" — kan ikke nå serveren.");return;}
-      clearTimeout(to);
       const txt=await res.text();let j={};try{j=JSON.parse(txt);}catch(e){}
       if(!res.ok){sbStatus("Login afvist (HTTP "+res.status+"): "+(j.error_description||j.msg||j.error||txt.slice(0,80)));return;}
       try{await sb.auth.setSession({access_token:j.access_token,refresh_token:j.refresh_token});}catch(e){}
       try{const{data}=await sb.auth.getSession();await applySession(data.session||{user:j.user});}catch(e){await applySession({user:j.user});}
       $("sbPass").value="";rememberEmail(em);sbStatus("Logget ind ✓",true);
-    }catch(e){sbStatus("Uventet fejl: "+(e&&(e.message||e.name)||e));console.error("WeldGauge login:",e);}}
+    }catch(e){sbStatus("Uventet fejl efter svar: "+(e&&(e.message||e.name)||e));console.error("WeldGauge login:",e);}}
   $("sbLogin").addEventListener("click",sbLogin);
   $("sbPass").addEventListener("keydown",e=>{if(e.key==="Enter")sbLogin();});
   async function sbLogout(){if(sbChan){try{sb.removeChannel(sbChan);}catch(e){}sbChan=null;}try{await sb.auth.signOut();}catch(e){}captures=captures.filter(c=>!c.remote);renderGallery();sbSag=null;sbStatus("Logget ud.");setSyncPill();}
