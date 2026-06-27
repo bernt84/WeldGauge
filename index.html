@@ -29,6 +29,7 @@
   header .scale-badge b{color:var(--cyan)}
   .stage{position:relative;flex:1;min-height:0;background:#000;overflow:hidden}
   #fsBtn{position:absolute;top:8px;right:8px;z-index:8;width:40px;height:40px;min-height:0;padding:0;border-radius:8px;background:rgba(13,17,23,.7);border:1px solid var(--line);color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center}
+  #calLockBtn{position:absolute;top:56px;right:8px;z-index:8;width:40px;height:40px;min-height:0;padding:0;border-radius:8px;background:rgba(13,17,23,.7);border:1px solid var(--line);color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center}
   #stateBanner{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:7;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;letter-spacing:.3px;white-space:nowrap;display:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
   #stateBanner.cal{display:block;background:#f0a020;color:#1a1205}
   #stateBanner.meas{display:block;background:rgba(57,197,207,.95);color:#04231f}
@@ -146,6 +147,7 @@
   <video id="video" playsinline autoplay muted></video>
   <img id="still" alt=""><canvas id="overlay"></canvas>
   <button id="fsBtn" title="Fuld skærm">⛶</button>
+  <button id="calLockBtn" style="display:none" title="Lås/lås op kalibrering">🔒</button>
   <div id="stateBanner"></div>
   <button id="calConfirmBtn" style="display:none">✓ Bekræft kalibrering</button>
   <div class="editbar" id="editbar"><button class="primary" id="saveEditBtn">✓ Gem ændringer</button><button class="ghost" id="closeEditBtn">Luk</button></div>
@@ -226,7 +228,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.13.0 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.13.1 (no-SW)</div>
   </div>
 
   <!-- ===== BILLEDBIBLIOTEK (sager → billeder) ===== -->
@@ -398,7 +400,7 @@
 
   let source="live",stream=null,track=null,haveImage=false,frozen=false;
   let calMode="manual",mode="measure",ctxMode="surface",fault="m_length";
-  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,capTarget=null,lastAthroat=null,athroatDrag=false;
+  let calPts=[],placing=[],marks=[],drag=null,mmPerPx=null,calibrating=false,calLocked=false,capTarget=null,lastAthroat=null,athroatDrag=false;
   let dpr=Math.max(1,window.devicePixelRatio||1),zoom=1,panX=0,panY=0;
   let hwZoom={min:1,max:1,cur:1,supported:false}; // kamera-zoom evner
   let captures=[],editIndex=-1,prevState=null,markerCorners=null;
@@ -498,7 +500,7 @@
   $("copyImgBtn").addEventListener("click",copyCurrentImage);
   $("fsSave")&&$("fsSave").addEventListener("click",saveCurrentImage);
   $("fsCopy")&&$("fsCopy").addEventListener("click",copyCurrentImage);
-  function newImage(){placing=[];marks=[];markerCorners=null;renderMarks();}
+  function newImage(){placing=[];marks=[];markerCorners=null;calLocked=false;$("calLockBtn").style.display="none";$("calConfirmBtn").style.display="none";renderMarks();}
 
   /* ============ KAMERA ============ */
   async function listCameras(){if(isMobile){populateCamSelect();return;}try{const t=await navigator.mediaDevices.getUserMedia({video:true});t.getTracks().forEach(x=>x.stop());}catch(e){}
@@ -635,7 +637,7 @@
   /* ============ INTERAKTION ============ */
   function ready(){return editIndex>=0||(source==="live"&&stream)||(source==="upload"&&haveImage)||frozen;}
   function getXY(e){const r=overlay.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
-  function hitTest(cx,cy){const tol=18;for(let di=0;di<marks.length;di++){const arr=marks[di].pts;for(let i=0;i<arr.length;i++){const cp=v2c(arr[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr,idx:i,mark:marks[di]};}}for(let i=0;i<placing.length;i++){const cp=v2c(placing[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:placing,idx:i};}for(let i=0;i<calPts.length;i++){const cp=v2c(calPts[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:calPts,idx:i,cal:true};}return null;}
+  function hitTest(cx,cy){const tol=18;for(let di=0;di<marks.length;di++){const arr=marks[di].pts;for(let i=0;i<arr.length;i++){const cp=v2c(arr[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr,idx:i,mark:marks[di]};}}for(let i=0;i<placing.length;i++){const cp=v2c(placing[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:placing,idx:i};}if(!calLocked)for(let i=0;i<calPts.length;i++){const cp=v2c(calPts[i]);if(Math.hypot(cx-cp.x/dpr,cy-cp.y/dpr)<tol)return{arr:calPts,idx:i,cal:true};}return null;}
   let pinch=null;
   function touchDist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
   function touchMid(t){return{x:(t[0].clientX+t[1].clientX)/2,y:(t[0].clientY+t[1].clientY)/2};}
@@ -690,8 +692,15 @@
   /* ============ KALIBRERING ============ */
   document.querySelectorAll("#calSeg button").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll("#calSeg button").forEach(x=>x.classList.remove("active"));b.classList.add("active");calMode=b.dataset.cal;$("calManualRow").style.display=calMode==="manual"?"flex":"none";$("calMarkerRow").style.display=calMode==="marker"?"flex":"none";}));
   function setScale(){const refMm=+$("refLen").value*+$("refUnit").value;const px=dist(calPts[0],calPts[1]);if(px>2&&refMm>0){mmPerPx=refMm/px;showScale();renderMarks();}}
-  function finishCal(){setScale();calibrating=false;$("calBtn").classList.remove("on");$("calConfirmBtn").style.display="none";setStatus("Kalibreret ✓ — du måler nu.");updateBanner();setHint();draw();}
+  function finishCal(){setScale();calibrating=false;calLocked=true;$("calBtn").classList.remove("on");$("calConfirmBtn").style.display="none";$("calLockBtn").style.display="flex";$("calLockBtn").textContent="🔒";setStatus("Kalibreret ✓ — låst. Tryk 🔒 for at justere.");updateBanner();setHint();draw();}
   $("calConfirmBtn").addEventListener("click",()=>{if(calPts.length===2)finishCal();});
+  $("calLockBtn").addEventListener("click",()=>{
+    if(calLocked){ // lås op → gå i juster-tilstand så punkterne kan trækkes og bekræftes igen
+      calLocked=false;calibrating=true;$("calBtn").classList.add("on");$("calLockBtn").textContent="✏️";$("calConfirmBtn").style.display=calPts.length===2?"block":"none";setStatus("Kalibrering låst op — træk punkterne og bekræft igen.");
+    }else{ // lås igen uden ændringer
+      if(calPts.length===2){calibrating=false;calLocked=true;$("calBtn").classList.remove("on");$("calConfirmBtn").style.display="none";$("calLockBtn").textContent="🔒";setStatus("Kalibrering låst.");}
+    }
+    updateBanner();setHint();draw();});
   function updateBanner(){const b=$("stateBanner");const t=I18N[lang]||I18N.da;b.className="";
     if(!ready()){b.style.display="none";return;}
     if(calibrating){b.classList.add("cal");b.textContent=calPts.length<2?(t.bCalSet||"🎯 KALIBRERER — sæt 2 punkter"):(t.bCalAdj||"🎯 KALIBRERER — justér og bekræft");return;}
@@ -699,7 +708,7 @@
     if(mode==="assess"){b.classList.add("assess");b.textContent=(t.bAssess||"✓ VURDERER")+" · "+nameOf(fault);}
     else{b.classList.add("meas");b.textContent=(t.bMeas||"📏 MÅLER")+" · "+nameOf(fault);}}
   function showScale(){$("scaleBadge").innerHTML=`<b>${(1/mmPerPx).toFixed(1)}</b> px/mm`;}
-  $("calBtn").addEventListener("click",()=>{if(!ready())return;calPts=[];mmPerPx=null;calibrating=true;$("calBtn").classList.add("on");$("calConfirmBtn").style.display="none";setStatus("Sæt to punkter på den kendte afstand — justér derefter og bekræft.");updateBanner();setHint();draw();});
+  $("calBtn").addEventListener("click",()=>{if(!ready())return;calPts=[];mmPerPx=null;calLocked=false;calibrating=true;$("calBtn").classList.add("on");$("calConfirmBtn").style.display="none";$("calLockBtn").style.display="none";setStatus("Sæt to punkter på den kendte afstand — justér derefter og bekræft.");updateBanner();setHint();draw();});
   $("refLen").addEventListener("input",()=>{if(calPts.length===2){setScale();draw();}});
   $("refUnit").addEventListener("change",()=>{if(calPts.length===2){setScale();draw();}});
 
