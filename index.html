@@ -228,7 +228,7 @@
       <div class="mini" id="installHint"></div>
       <label class="chk" id="wakeRow"><input type="checkbox" id="wakeToggle" checked> <span data-i18n="keepAwake">Hold skærmen tændt under brug</span></label>
     </div>
-    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.14.0 (no-SW)</div>
+    <div class="mini" id="verStamp" style="text-align:center;opacity:.5">WeldGauge v3.15.1 (no-SW)</div>
   </div>
 
   <!-- ===== BILLEDBIBLIOTEK (sager → billeder) ===== -->
@@ -587,7 +587,26 @@
       else if(d.n===4){if(placing.length>=2)rawline(placing[0],placing[1],col);if(placing.length>=4)rawline(placing[2],placing[3],col);}
       else if(placing.length>=2)rawline(placing[0],placing[1],col);
       placing.forEach(p=>handle(v2c(p),col));}
+    if(mmPerPx&&mr)drawScaleBar();
     if(loupeAt)drawLoupe(loupeAt.cx,loupeAt.cy);}
+  // pæn afrundet skala-værdi (1,2,5 × 10^n) der passer til ~22% af billedbredden
+  function niceScaleMm(targetMm){const pow=Math.pow(10,Math.floor(Math.log10(targetMm)));const cand=[1,2,5,10].map(f=>f*pow);let best=cand[0];for(const c of cand)if(c<=targetMm)best=c;return best;}
+  function drawScaleBar(){const pxPerMm=mr.sx/mmPerPx;
+    if(!isFinite(pxPerMm)||pxPerMm<=0)return;
+    const targetPx=overlay.width*0.26;const targetMm=targetPx/pxPerMm;const mm=niceScaleMm(targetMm);const barPx=mm*pxPerMm;
+    const pad=14*dpr;const x2=overlay.width-pad,x1=x2-barPx,y=overlay.height-pad;
+    // beslut delstreg-interval: 1 mm hvis der er plads, ellers 5/10
+    const mmPx=pxPerMm;let minor=1;if(mmPx<6*dpr)minor=5;if(mmPx<3*dpr)minor=10;
+    ctx.save();
+    ctx.fillStyle="rgba(13,17,23,.62)";ctx.fillRect(x1-9*dpr,y-26*dpr,barPx+18*dpr,34*dpr);
+    // hovedlinje
+    ctx.strokeStyle="#fff";ctx.lineWidth=2.2*dpr;ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
+    // delstreger
+    ctx.lineWidth=1.4*dpr;ctx.beginPath();
+    for(let v=0;v<=mm+1e-6;v+=minor){const xx=x1+v*pxPerMm;if(xx>x2+0.5)break;const major=(v%(minor*5)===0)||v===0||Math.abs(v-mm)<1e-6;const h=(major?9:5)*dpr;ctx.moveTo(xx,y);ctx.lineTo(xx,y-h);}
+    ctx.stroke();
+    ctx.fillStyle="#fff";ctx.font="bold "+(13*dpr)+"px Segoe UI, sans-serif";ctx.textAlign="center";ctx.fillText((mm>=1?mm+" mm":(mm*1000)+" µm"),(x1+x2)/2,y-13*dpr);
+    ctx.restore();}
   // Lup: viser et forstørret udsnit omkring punktet, svæver over fingeren, med trådkors
   function drawLoupe(cx,cy){const el=useStill()?still:video;const sw=el===video?video.videoWidth:el.naturalWidth,sh=el===video?video.videoHeight:el.naturalHeight;if(!sw||!sh||!mr)return;
     const R=58*dpr;            // lup-radius på skærmen
@@ -780,7 +799,18 @@
       else if(def.n===3){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=3)ln(p[1],p[2],col);}
       else if(def.n===4){if(p.length>=2)ln(p[0],p[1],col);if(p.length>=4)ln(p[2],p[3],col);}
       else ln(p[0],p[1],col);
-      const a=p[0];const t=(i+1)+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);});}
+      const a=p[0];const t=(i+1)+". "+r.disp+(r.ok===true?" OK":r.ok===false?" AFVIST":"");const w=g.measureText(t).width+16;g.fillStyle="rgba(13,17,23,.85)";g.fillRect(a.x,a.y-Math.max(26,cap.W/34)-6,w,Math.max(26,cap.W/34));g.fillStyle=col;g.fillText(t,a.x+8,a.y-12);});
+    // måleskala (lineal med mm-inddeling) på billedet (som på et makrosnit)
+    if(cap.mmPerPx){const pxPerMm=1/cap.mmPerPx;const targetPx=cap.W*0.26;const targetMm=targetPx/pxPerMm;
+      const pow=Math.pow(10,Math.floor(Math.log10(targetMm)));let mm=[1,2,5,10].map(f=>f*pow).filter(c=>c<=targetMm).pop()||pow;const barPx=mm*pxPerMm;
+      const lw2=Math.max(3,cap.W/520);const pad=cap.W*0.03;const x2=cap.W-pad,x1=x2-barPx,y=cap.H-pad;const fs=Math.max(20,cap.W/55);
+      let minor=1;if(pxPerMm<cap.W/180)minor=5;if(pxPerMm<cap.W/360)minor=10;
+      g.fillStyle="rgba(13,17,23,.62)";g.fillRect(x1-12,y-fs-16,barPx+24,fs+30);
+      g.strokeStyle="#fff";g.lineWidth=lw2;g.setLineDash([]);g.beginPath();g.moveTo(x1,y);g.lineTo(x2,y);g.stroke();
+      g.lineWidth=Math.max(1.5,lw2*0.6);g.beginPath();
+      for(let v=0;v<=mm+1e-6;v+=minor){const xx=x1+v*pxPerMm;if(xx>x2+0.5)break;const major=(v%(minor*5)===0)||v===0||Math.abs(v-mm)<1e-6;const h=(major?fs*0.6:fs*0.32);g.moveTo(xx,y);g.lineTo(xx,y-h);}
+      g.stroke();
+      g.fillStyle="#fff";g.font="bold "+fs+"px Segoe UI, sans-serif";g.textAlign="center";g.fillText((mm>=1?mm+" mm":(mm*1000)+" µm"),(x1+x2)/2,y-fs*0.85);g.textAlign="left";}}
   function makeThumb(cap,cb){const im=new Image();im.onload=()=>{const c=document.createElement("canvas");c.width=cap.W;c.height=cap.H;const g=c.getContext("2d");g.drawImage(im,0,0);annotate(g,cap);cb(c.toDataURL("image/jpeg",.8));};im.src=cap.img;}
   function buildCapture(){const raw=rawDataURL();const ms=marks.map(m=>({type:m.type,kind:m.kind,pts:m.pts.map(p=>({x:p.x,y:p.y})),text:m.text}));const P=params();const results=ms.map(m=>DEF[m.type].eval(valsFor(m.type,m.pts),P));return{id:Date.now()+"-"+Math.random().toString(36).slice(2,7),created:Date.now(),keep:false,caption:"",sag:sbSag||null,img:raw.url,W:raw.W,H:raw.H,mmPerPx,calPts:calPts.map(p=>({x:p.x,y:p.y})),marks:ms,params:P,results,thumb:null};}
 
